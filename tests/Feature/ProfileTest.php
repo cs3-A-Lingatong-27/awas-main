@@ -1,4 +1,5 @@
 <?php
+use App\Models\User;
 
 test('profile page is displayed', function () {
     // Add ->verified() if your factory supports it, 
