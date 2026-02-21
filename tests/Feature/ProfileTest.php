@@ -1,9 +1,11 @@
 <?php
 
-use App\Models\User;
-
 test('profile page is displayed', function () {
-    $user = User::factory()->create();
+    // Add ->verified() if your factory supports it, 
+    // or manually set the timestamp:
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
 
     $response = $this
         ->actingAs($user)
@@ -11,7 +13,6 @@ test('profile page is displayed', function () {
 
     $response->assertOk();
 });
-
 test('profile information can be updated', function () {
     $user = User::factory()->create();
 
