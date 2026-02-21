@@ -18,25 +18,29 @@ class AssessmentController extends Controller
     public function store(Request $request)
     {
         // 1. Validate the teacher's input
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'type' => 'required',
-            'due_date' => 'required|date',
-            'due_time' => 'required',
-        ]);
+$request->validate([
+    'title' => 'required|string|max:255',
+    'type' => 'required',
+    'due_date' => 'required|date',
+    'due_time' => 'required',
+    'grade_level' => 'required|integer', // Added
+    'subject' => 'required|string',      // Added
+]);
 
         // 2. Combine date and time into one "scheduled_at" field
         $scheduledAt = $request->due_date . ' ' . $request->due_time;
 
         // 3. THE ALGORITHM: Conflict Detection (Section 1.1 of your paper)
         // Count assessments already scheduled for that day
-        $count = Assessment::whereDate('scheduled_at', $request->due_date)->count();
+// THE ALGORITHM: Section-Specific Conflict Detection
+$count = Assessment::whereDate('scheduled_at', $request->due_date)
+    ->where('grade_level', $request->grade_level) // Only count for the same grade
+    // ->where('section', $request->section) // Add this if you want section-specific
+    ->count();
 
-        // PSHS Policy: Let's say max 3 assessments per day
-        if ($count >= 3) {
-            return back()->with('error', "Conflict! There are already $count assessments on this day.");
-        }
-
+if ($count >= 3) {
+    return back()->with('error', "Conflict! Grade {$request->grade_level} already has $count assessments on this day.");
+}
 Assessment::create([
     'title'        => $request->title,
     'type'         => $request->type,
