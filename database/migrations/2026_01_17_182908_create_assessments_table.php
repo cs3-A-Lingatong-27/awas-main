@@ -13,12 +13,15 @@ public function up(): void
 {
     Schema::create('assessments', function (Blueprint $table) {
         $table->id();
-        $table->foreignId('user_id')->constrained()->onDelete('cascade'); // The Teacher
+        // The teacher who created it
+        $table->foreignId('user_id')->constrained()->onDelete('cascade'); 
         $table->foreignId('subject_id')->nullable()->constrained()->onDelete('cascade');
-        $table->string('section');      // e.g., 'Diamond', 'Einstein'
-        $table->integer('grade_level'); // e.g., 7, 11
-        $table->string('type');         // Formative, Summative, etc.
+        $table->foreignId('room_id')->nullable()->constrained()->onDelete('cascade');
+        
+        $table->string('section'); // IMPORTANT: e.g., 'Einstein', 'Newton'
+        $table->string('type');    // Formative, Summative, etc.
         $table->string('title');
+        $table->text('description')->nullable();
         $table->dateTime('scheduled_at'); 
         $table->timestamps();
     });
