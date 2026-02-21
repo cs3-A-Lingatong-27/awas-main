@@ -1,0 +1,437 @@
+/* Variables for easy color changes */
+:root {
+  --primary-blue: #1f00c6;
+  --bg-gray: #f6f6f6;
+  --border-black: #111111;
+  --hover-yellow: #fff9c4;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg-gray);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    height: 70px;
+    background: #1f00c6;
+    color: white;
+}
+
+.main {
+    display: flex;
+    width: 100%;
+    min-height: calc(100vh - 70px); /* Adjust based on topbar height */
+    align-items: stretch;
+}
+
+/* --- Sidebar with Hover Effects --- */
+.sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #f8f9fa;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+}
+
+.menu-item {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+/* Sidebar base state - add transition */
+.sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #f8f9fa;
+    transition: all 0.3s ease-in-out;
+    overflow: hidden; /* This stops the text from bunching up */
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+/* Ensure the hamburger icon in the topbar is a pointer */
+.menu-icon {
+    cursor: pointer;
+    font-size: 24px;
+    margin-right: 20px;
+    user-select: none;
+}
+
+.menu-item:hover {
+  background: #f0f0ff;
+  padding-left: 20px; /* Subtle slide effect */
+  color: var(--primary-blue);
+  font-weight: bold;
+}
+
+/* The Calendar Grid itself should be wide */
+.calendar-section {
+    width: 100%;
+    max-width: 1200px; /* Optional: prevents it from getting TOO wide on huge monitors */
+    margin: 0 auto;
+}
+
+.calendar-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr); /* Ensures 7 equal columns */
+    gap: 10px;
+    width: 100%;
+}
+
+.calendar-header {
+  background: #eee;
+  padding: 15px;
+  text-align: center;
+  font-weight: bold;
+  border: 1px solid var(--border-black);
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+.calendar-day {
+    position: relative; /* Essential for dot positioning */
+    min-height: 100px;
+    border: 1px solid #e5e7eb;
+    padding: 10px;
+    cursor: pointer;
+}
+
+/* Calendar Day Hover Effect */
+.calendar-day:not(.empty):hover {
+  background-color: var(--hover-yellow);
+  cursor: pointer;
+  transform: scale(1.01);
+  z-index: 2;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+.grade-item-card {
+    transition: transform 0.2s;
+}
+.grade-item-card:hover {
+    transform: translateX(5px);
+}
+
+/* Red Notifications */
+.notification-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: #ef4444; /* PSHS Red */
+    color: white;
+    border-radius: 9999px;
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* --- Responsive Rules --- */
+@media (max-width: 900px) {
+.main {
+    display: flex;
+    flex-direction: row; /* Ensure they stay side-by-side */
+    width: 100%;
+    overflow: hidden;
+}
+  .sidebar {
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    padding: 10px;
+  }
+  .menu-item {
+    border-bottom: none;
+    border-right: 1px solid #eee;
+    white-space: nowrap;
+  }
+}
+.content-tab {
+    flex: 1; /* This forces the calendar to take up ALL remaining space */
+    padding: 30px;
+    background: white;
+    min-width: 0; /* Critical for flexbox math */
+}
+
+@media (max-width: 600px) {
+  .calendar-header {
+    font-size: 10px;
+    padding: 5px;
+  }
+  .calendar-day {
+    min-height: 70px;
+    font-size: 12px;
+  }
+}
+/* The Slide-out Panel */
+.side-panel {
+    position: fixed;
+    top: 0;
+    right: -400px; /* Hidden off-screen */
+    width: 350px;
+    height: 100%;
+    background: white;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    transition: 0.3s ease-in-out;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.side-panel.open {
+    right: 0; /* Slide in */
+}
+
+/* Background Dimmer */
+.panel-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    z-index: 999;
+}
+
+.panel-overlay.active {
+    display: block;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+.scholar-btn {
+    background-color: #1f00c6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.scholar-btn:hover {
+    background-color: #3b19ff;
+}
+
+.logout-btn {
+    background: transparent;
+    border: 1px solid #ff4d4d;
+    color: #ff4d4d !important;
+    padding: 5px 12px;
+    border-radius: 4px;
+    margin-left: 10px;
+}
+
+.logout-btn:hover {
+    background: #ff4d4d;
+    color: white !important;
+}
+
+.profile-card {
+    padding: 15px;
+    background: #fcfcfc;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.profile-card p {
+    margin: 10px 0;
+    color: #333;
+}
+/* Profile Card in Panel */
+.profile-card {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    margin-bottom: 20px;
+}
+
+.profile-avatar {
+    width: 60px;
+    height: 60px;
+    background: #1f00c6;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 auto 10px;
+}
+
+.menu-divider {
+    height: 1px;
+    background: #eee;
+    margin: 20px 0;
+}
+
+/* Logout Button Styling */
+.logout-action-btn {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: #fff5f5;
+    border: 1px solid #ffe3e3;
+    border-radius: 10px;
+    color: #e03131;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.logout-action-btn:hover {
+    background: #e03131;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(224, 49, 49, 0.2);
+}
+
+.text-muted {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+.enrollment-card {
+    max-width: 600px;
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    margin: 0 auto;
+}
+
+.mini-form .form-group {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.mini-form label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #444;
+}
+
+.mini-form input, .mini-form select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.menu-item.active {
+    background-color: #1f00c6;
+    color: white;
+    font-weight: bold;
+}
+.academic-info {
+    margin-top: 25px;
+}
+
+.info-group label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #888;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.stat-grid {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0 20px 0;
+}
+
+.stat-item {
+    flex: 1;
+    background: #f1f3f9;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-item span { font-size: 0.7rem; display: block; }
+
+.grade-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.grade-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 0.9rem;
+}
+
+.grade {
+    color: #1f00c6;
+    font-weight: bold;
+}
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #2ecc71;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 9999;
+    transition: opacity 0.5s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
