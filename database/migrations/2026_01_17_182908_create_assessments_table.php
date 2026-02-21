@@ -13,13 +13,17 @@ public function up(): void
 {
     Schema::create('assessments', function (Blueprint $table) {
         $table->id();
-        // The teacher who created it
+        // 1. Link to the Teacher (Crucial for line 73 of your controller)
         $table->foreignId('user_id')->constrained()->onDelete('cascade'); 
+        
         $table->foreignId('subject_id')->nullable()->constrained()->onDelete('cascade');
         $table->foreignId('room_id')->nullable()->constrained()->onDelete('cascade');
         
-        $table->string('section'); // IMPORTANT: e.g., 'Einstein', 'Newton'
-        $table->string('type');    // Formative, Summative, etc.
+        // 2. Added for AWAS logic
+        $table->integer('grade_level'); 
+        $table->string('section')->nullable(); 
+        
+        $table->string('type'); 
         $table->string('title');
         $table->text('description')->nullable();
         $table->dateTime('scheduled_at'); 

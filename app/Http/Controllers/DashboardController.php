@@ -8,43 +8,43 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
-    {
-        // Get current month/year from request or default to now
-        $month = $request->get('month', date('m'));
-        $year = $request->get('year', date('Y'));
-        
-        // Create Carbon instance for the selected month
-        $date = Carbon::createFromDate($year, $month, 1);
+   public function index(Request $request)
+{
+    $user = auth()->user();
+    $month = $request->get('month', date('m'));
+    $year = $request->get('year', date('Y'));
+    $date = Carbon::createFromDate($year, $month, 1);
 
-        $daysInMonth = $date->daysInMonth;
-        $firstDayOfMonth = $date->dayOfWeek;
+    // Get the arrays we set up in Tinker
+    $assignedGrades = is_array($user->assigned_grades) ? $user->assigned_grades : json_decode($user->assigned_grades, true) ?? [];
 
-        // Use startOfMonth and endOfMonth for a more reliable database query
-        $startOfMonth = $date->copy()->startOfMonth()->toDateString();
-        $endOfMonth = $date->copy()->endOfMonth()->toDateString();
+    $startOfMonth = $date->copy()->startOfMonth()->toDateTimeString();
+    $endOfMonth = $date->copy()->endOfMonth()->toDateTimeString();
 
-        // 1. Fetch assessments using a Date Range
-        // We check 'scheduled_at' and 'due_date' to ensure compatibility with various DB naming conventions
-        $query = Assessment::where(function($q) use ($startOfMonth, $endOfMonth) {
-            $q->whereBetween('scheduled_at', [$startOfMonth, $endOfMonth])
-              ->orWhereBetween('due_date', [$startOfMonth, $endOfMonth]);
-        });
+    // 1. Fetch assessments filtered by the teacher's assigned grades
+// 1. Fetch assessments filtered by the teacher's assigned grades
+$query = Assessment::whereIn('grade_level', $assignedGrades)
+    ->where(function($q) use ($startOfMonth, $endOfMonth) {
+        // We check both columns to be safe
+        $q->whereBetween('scheduled_at', [$startOfMonth, $endOfMonth])
+          ->orWhereBetween('due_date', [$startOfMonth, $endOfMonth]);
+    });
 
-        // 2. Process the results for the calendar view (Red Dots)
-        $notifications = $query->get()
-            ->groupBy(function($val) {
-                // Use whichever column is actually populated in the database
-                $dateValue = $val->scheduled_at ?? $val->due_date;
-                return Carbon::parse($dateValue)->format('j');
-            })
-            ->map->count();
+// 2. Process counts (Grouping by the correct date)
+$notifications = $query->get()
+    ->groupBy(function($val) {
+        // Use scheduled_at if it exists, otherwise use due_date
+        $actualDate = $val->scheduled_at ?? $val->due_date;
+        return Carbon::parse($actualDate)->format('j');
+    })
+    ->map->count();
 
-        return view('dashboard', compact(
-            'date', 
-            'notifications', 
-            'daysInMonth', 
-            'firstDayOfMonth'
-        ));
-    }
+    return view('dashboard', [
+        'date' => $date,
+        'notifications' => $notifications,
+        'daysInMonth' => $date->daysInMonth,
+        'firstDayOfMonth' => $date->dayOfWeek,
+        'assignedGrades' => $assignedGrades // Useful for the frontend
+    ]);
+}
 }

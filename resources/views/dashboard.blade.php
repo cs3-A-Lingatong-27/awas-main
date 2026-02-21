@@ -8,6 +8,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
+@if(session('error'))
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+        <p class="font-bold">Conflict Detected</p>
+        <p>{{ session('error') }}</p>
+    </div>
+@endif
     
   @if(session('success'))
     <div id="successToast" class="toast-notification">
@@ -109,18 +115,29 @@
                 @endfor
 
            @for ($day = 1; $day <= $daysInMonth; $day++)
-    <div class="calendar-day" 
-         onclick="openPanel({{ $day }}, '{{ $date->format('F') }} {{ $day }}, {{ $date->year }}')">
-        
-        {{ $day }}
+                @php 
+                    $count = $notifications[$day] ?? 0; 
+                    $currentDateString = $date->copy()->day($day)->format('F j, Y');
+                @endphp
 
-        {{-- Show real count from the controller --}}
-        @if(isset($notifications[$day]) && $notifications[$day] > 0)
-            <div class="notification-dot">{{ $notifications[$day] }}</div>
-        @endif
-    </div>
-@endfor
-            </div>
+                <div class="calendar-day cursor-pointer hover:bg-blue-50 transition" onclick="openPanel({{ $day }}, '{{ $currentDateString }}')">
+                    <span>{{ $day }}</span>
+                    
+                    @if($count > 0)
+                        <div class="flex gap-1 justify-center">
+                            @if($count >= 3)
+                                <span class="h-2 w-2 bg-red-500 rounded-full" title="Fully Booked"></span>
+                            @elseif($count >= 2)
+                                <span class="h-2 w-2 bg-yellow-500 rounded-full" title="Approaching Limit"></span>
+                            @else
+                                <span class="h-2 w-2 bg-blue-500 rounded-full" title="Assessments Scheduled"></span>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @endfor </div> </section> </section> @if(auth()->user()->role === 'admin')
+    @endif
+</div>
         </section>
     </section>
 
@@ -189,16 +206,16 @@
             @if(auth()->user()->role === 'student')
                 <div class="info-group">
                     <label>Current Standing</label>
-                    <div class="stat-grid">
-                        <div class="stat-item">
-                            <span>Grade</span>
-                            <strong>{{ auth()->user()->grade_level }}</strong>
-                        </div>
-                        <div class="stat-item">
-                            <span>Section</span>
-                            <strong>{{ auth()->user()->section }}</strong>
-                        </div>
-                    </div>
+<div class="stat-grid">
+    <div class="stat-item">
+        <span>Grade</span>
+        <strong class="text-blue-700">{{ auth()->user()->grade_level ?? 'N/A' }}</strong>
+    </div>
+    <div class="stat-item">
+        <span>Section</span>
+        <strong class="text-blue-700">{{ auth()->user()->section ?? 'Unassigned' }}</strong>
+    </div>
+</div>
                 </div>
 
                 <div class="info-group">
@@ -236,7 +253,22 @@
     <script>
 let tempDate = '';
 let tempDateString = '';
+const sectionsByGrade = {
+    "7": ["Opal", "Turquoise", "Aquamarine", "Sapphire"],
+    "8": ["Anthurium", "Carnation", "Daffodil", "Sunflower"],
+    "9": ["Calcium", "Lithium", "Barium", "Sodium"],
+    "10": ["Graviton", "Proton", "Neutron", "Electron"],
+    "11": ["Mars", "Mercury", "Venus"],
+    "12": ["Orosa", "Del Mundo", "Zara"]
+};
 
+function updateEnrollmentSections() {
+    const grade = document.querySelector('select[name="grade_level"]').value;
+    const sectionInput = document.querySelector('input[name="section"]');
+    
+    // Optional: Turn the section input into a dropdown for better UX
+    console.log("Suggested sections for Grade " + grade + ": " + sectionsByGrade[grade].join(", "));
+}
 // This replaces your old openPanel
 function openPanel(day, dateString) {
     const year = {{ $date->year }};
@@ -317,29 +349,29 @@ function closeChoiceModal() {
     document.getElementById('choiceModal').classList.add('hidden');
     document.getElementById('choiceModal').classList.remove('flex');
 }
-    const subjectMap = {
-    "7": ["Math 1", "Integrated Science 1"],
-    "8": ["Math 2", "Math 3", "Integrated Science 2"],
-    "9": ["Math 4", "Chemistry 1", "Physics 1", "Biology 1"],
-    "10": ["Math 5", "Chemistry 2", "Physics 2", "Biology 2"],
-    "11": ["Math 6 Level 1", "Math 6 Level 2", "Physics 3 Core", "Bio", "Chem", "Physics 3 Elective", "Biology 3 Elective", "Chemistry 3 Elective"],
-    "12": ["Math 7 Level 1/2", "Physics 4 Core", "Bio", "Chem", "Physics 4 Elective", "Biology 4 Elective", "Chemistry 4 Elective"]
-};
+// 1. Get the subjects assigned to this specific teacher from PHP
+const assignedSubjects = @json(auth()->user()->assigned_subjects ?? []);
+const assignedGrades = @json(auth()->user()->assigned_grades ?? []);
 
 function updateSubjects() {
-    const grade = document.getElementById('gradeSelect').value;
+    const selectedGrade = document.getElementById('gradeSelect').value;
     const subjectSelect = document.getElementById('subjectSelect');
     
-    // Clear existing options
     subjectSelect.innerHTML = '<option value="">Select Subject</option>';
     
-    if (grade && subjectMap[grade]) {
-        subjectMap[grade].forEach(subject => {
+    // 2. Logic: Only show subjects if the teacher is assigned to this grade
+    if (assignedGrades.includes(parseInt(selectedGrade))) {
+        assignedSubjects.forEach(subject => {
             const option = document.createElement('option');
             option.value = subject;
             option.text = subject;
             subjectSelect.appendChild(option);
         });
+    } else {
+        const option = document.createElement('option');
+        option.text = "You aren't assigned to this grade";
+        option.disabled = true;
+        subjectSelect.appendChild(option);
     }
 }
         function openScholarPanel() {
@@ -409,8 +441,8 @@ function updateSubjects() {
             <div class="form-group">
                 <label>Assessment Type</label>
                 <select name="type" required>
-                    <option value="Formative">Formative Assessment</option>
-                    <option value="Alternative">Alternative Assessment (AA)</option>
+                    <option value="Formative Assessment">Formative Assessment (FA)</option>
+                    <option value="Alternative Assessment">Alternative Assessment (AA)</option>
                     <option value="Long Test">Long Test</option>
                     <option value="Summative">Summative Assessment</option>
                 </select>
@@ -422,7 +454,8 @@ function updateSubjects() {
                     <input type="time" name="due_time" required>
                 </div>
             </div>
-
+            <div id="awas-advice" class="text-xs mt-2 p-2 rounded bg-blue-50 text-blue-700 hidden">
+    </div>
             <button type="submit" class="scholar-btn" style="width: 100%; margin-top: 15px;">Save Assessment</button>
         </form>
     </div>
