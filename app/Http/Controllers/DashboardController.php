@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Assessment;
+use App\Models\Subject;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -40,11 +41,13 @@ $notifications = $query->get()
     ->map->count();
 
     return view('dashboard', [
+        'user' => $user, 
         'date' => $date,
         'notifications' => $notifications,
         'daysInMonth' => $date->daysInMonth,
         'firstDayOfMonth' => $date->dayOfWeek,
-        'assignedGrades' => $assignedGrades // Useful for the frontend
+        'assignedGrades' => $assignedGrades,
+        'subjectCatalog' => Subject::select('name', 'type', 'grade_level_start', 'grade_level_end')->get(),
     ]);
 }
 }

@@ -26,6 +26,8 @@ protected $fillable = [
     'role',         // Add this
     'grade_level',  // Add this
     'section',      // Add this
+    'assigned_grades',
+    'assigned_subjects',
 ];
 
     /**
@@ -48,6 +50,8 @@ protected $fillable = [
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'assigned_grades' => 'array',
+            'assigned_subjects' => 'array',
         ];
     }
 
@@ -61,5 +65,15 @@ protected $fillable = [
             ->take(2)
             ->map(fn ($word) => Str::substr($word, 0, 1))
             ->implode('');
+    }
+
+    public function studentGradeSection()
+    {
+        return $this->hasOne(StudentGradeSection::class);
+    }
+
+    public function studentSubjects()
+    {
+        return $this->hasMany(StudentSubject::class);
     }
 }

@@ -435,3 +435,130 @@ body {
     align-items: center;
     gap: 10px;
 }
+
+/* Dashboard dark mode */
+html.dark-mode body,
+body.dark-mode {
+    background: #0b1220 !important;
+    color: #e5e7eb;
+}
+
+html.dark-mode body .topbar,
+body.dark-mode .topbar {
+    background: #0f172a !important;
+}
+
+html.dark-mode body .app,
+html.dark-mode body .auth-card,
+html.dark-mode body .content-tab,
+html.dark-mode body .calendar-section,
+html.dark-mode body .side-panel,
+html.dark-mode body .enrollment-card,
+html.dark-mode body .profile-card,
+html.dark-mode body .stat-item,
+body.dark-mode .app,
+body.dark-mode .auth-card,
+body.dark-mode .content-tab,
+body.dark-mode .calendar-section,
+body.dark-mode .side-panel,
+body.dark-mode .enrollment-card,
+body.dark-mode .profile-card,
+body.dark-mode .stat-item {
+    background: #111827 !important;
+    color: #e5e7eb !important;
+}
+
+html.dark-mode body .calendar-header,
+html.dark-mode body .calendar-day,
+html.dark-mode body .panel-header,
+html.dark-mode body .mini-form input,
+html.dark-mode body .mini-form select,
+html.dark-mode body #calendarHoverCard,
+html.dark-mode body #choiceModal > div,
+body.dark-mode .calendar-header,
+body.dark-mode .calendar-day,
+body.dark-mode .panel-header,
+body.dark-mode .mini-form input,
+body.dark-mode .mini-form select,
+body.dark-mode #calendarHoverCard,
+body.dark-mode #choiceModal > div {
+    background: #1f2937 !important;
+    color: #e5e7eb !important;
+    border-color: #334155 !important;
+}
+
+html.dark-mode body .menu-divider,
+body.dark-mode .menu-divider {
+    background: #334155;
+}
+
+html.dark-mode body .text-muted,
+html.dark-mode body .info-group label,
+body.dark-mode .text-muted,
+body.dark-mode .info-group label {
+    color: #cbd5e1;
+}
+
+html.dark-mode body a,
+body.dark-mode a {
+    color: #93c5fd;
+}
+
+html.dark-mode body .relative.min-h-screen.overflow-hidden.bg-slate-100,
+body.dark-mode .relative.min-h-screen.overflow-hidden.bg-slate-100 {
+    background: #0b1220 !important;
+}
+
+html.dark-mode body .absolute.inset-0,
+body.dark-mode .absolute.inset-0 {
+    opacity: 0.15;
+}
+
+/* Strong text contrast overrides for Tailwind utility classes used in dashboard */
+html.dark-mode body [class*="text-gray-"],
+html.dark-mode body [class*="text-slate-"],
+body.dark-mode [class*="text-gray-"],
+body.dark-mode [class*="text-slate-"] {
+    color: #e5e7eb !important;
+}
+
+html.dark-mode body [class*="text-blue-"],
+html.dark-mode body [class*="text-emerald-"],
+html.dark-mode body [class*="text-amber-"],
+body.dark-mode [class*="text-blue-"],
+body.dark-mode [class*="text-emerald-"],
+body.dark-mode [class*="text-amber-"] {
+    color: #93c5fd !important;
+}
+
+html.dark-mode body [class*="bg-blue-100"],
+html.dark-mode body [class*="bg-emerald-100"],
+html.dark-mode body [class*="bg-amber-100"],
+html.dark-mode body [class*="bg-slate-100"],
+html.dark-mode body [class*="bg-white"],
+body.dark-mode [class*="bg-blue-100"],
+body.dark-mode [class*="bg-emerald-100"],
+body.dark-mode [class*="bg-amber-100"],
+body.dark-mode [class*="bg-slate-100"],
+body.dark-mode [class*="bg-white"] {
+    background-color: #1f2937 !important;
+    color: #e5e7eb !important;
+}
+
+html.dark-mode body input,
+html.dark-mode body select,
+html.dark-mode body textarea,
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+    color: #f8fafc !important;
+    background-color: #0f172a !important;
+    border-color: #334155 !important;
+}
+
+html.dark-mode body input::placeholder,
+html.dark-mode body textarea::placeholder,
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+    color: #94a3b8 !important;
+}

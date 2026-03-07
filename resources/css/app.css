@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --awas-primary: #0369a1;
+        --awas-primary-strong: #075985;
+        --awas-ink: #0f172a;
+        --awas-muted: #475569;
+        --awas-surface: #f8fafc;
+    }
+
+    body {
+        @apply bg-slate-50 text-slate-900 antialiased;
+    }
+}
+
+@layer components {
+    .auth-card {
+        @apply rounded-3xl border border-white/70 bg-white/85 shadow-2xl backdrop-blur;
+    }
+
+    .auth-input {
+        @apply mt-2 block w-full rounded-xl border-slate-300 bg-white/90 px-4 py-3 shadow-sm focus:border-sky-500 focus:ring-sky-500;
+    }
+
+    .auth-btn {
+        @apply rounded-xl bg-sky-600 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-sky-700 focus:bg-sky-700 active:bg-sky-800 focus:ring-sky-500;
+    }
+}

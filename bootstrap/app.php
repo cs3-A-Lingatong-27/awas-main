@@ -11,7 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Allow logout even if the page's CSRF token is stale to avoid 419 on sign-out.
+        $middleware->validateCsrfTokens(except: [
+            'logout',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

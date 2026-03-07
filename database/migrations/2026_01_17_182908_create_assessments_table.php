@@ -26,7 +26,7 @@ public function up(): void
         $table->string('type'); 
         $table->string('title');
         $table->text('description')->nullable();
-        $table->dateTime('scheduled_at'); 
+        $table->dateTime('due_date'); 
         $table->timestamps();
     });
 }
