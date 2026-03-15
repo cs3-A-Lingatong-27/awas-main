@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\Assessment;
 use App\Models\StudentGradeSection;
 use App\Models\StudentSubject;
+use App\Models\Subject;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
@@ -26,6 +27,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Admin Enrollment Page
+    Route::get('/admin/enrollment', function () {
+        if (auth()->user()->role !== 'admin') {
+            abort(403);
+        }
+
+        return view('admin.enrollment', [
+            'user' => auth()->user(),
+            'subjectCatalog' => Subject::select('name', 'type', 'grade_level_start', 'grade_level_end')->get(),
+        ]);
+    })->name('admin.enrollment');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
