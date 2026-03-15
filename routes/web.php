@@ -140,7 +140,26 @@ Route::get('/api/assessments-by-date', function (Request $request) {
 
         return $query->get()
             ->groupBy(fn($val) => Carbon::parse($val->scheduled_at)->format('j'))
-            ->map->count();
+            ->map(function ($items) {
+                $counts = [
+                    'formative' => 0,
+                    'alternative' => 0,
+                    'long_test' => 0,
+                ];
+
+                foreach ($items as $assessment) {
+                    $type = $assessment->type;
+                    if ($type === 'Formative Assessment') {
+                        $counts['formative']++;
+                    } elseif ($type === 'Long Test') {
+                        $counts['long_test']++;
+                    } elseif ($type === 'Alternative Assessment (AA)' || $type === 'Alternative Assessment') {
+                        $counts['alternative']++;
+                    }
+                }
+
+                return $counts;
+            });
     });
 
     /**

@@ -82,6 +82,11 @@
         <section id="calendar-tab" class="content-tab" style="display: block;">
             <section class="calendar-section">
                 <div class="calendar-title">{{ $date->format('F Y') }}</div>
+                <div class="calendar-legend">
+                    <span class="legend-item"><span class="calendar-dot dot-alternative"></span> Alternative Assessment</span>
+                    <span class="legend-item"><span class="calendar-dot dot-formative"></span> Formative Assessment</span>
+                    <span class="legend-item"><span class="calendar-dot dot-longtest"></span> Long Test</span>
+                </div>
                 
                 <div class="calendar-nav" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
                     <form action="{{ route('dashboard') }}" method="GET" class="flex gap-2">
@@ -175,17 +180,7 @@
                             onclick="openPanel({{ $day }}, '{{ $currentDateString }}')"
                         >
                             <span class="calendar-day-number">{{ $day }}</span>
-                            @if($count > 0)
-                                <div class="flex gap-1 justify-center">
-                                    @if($count >= 3)
-                                        <span class="h-2 w-2 bg-red-500 rounded-full"></span>
-                                    @elseif($count >= 2)
-                                        <span class="h-2 w-2 bg-yellow-500 rounded-full"></span>
-                                    @else
-                                        <span class="h-2 w-2 bg-blue-500 rounded-full"></span>
-                                    @endif
-                                </div>
-                            @endif
+                            <div class="calendar-day-dots"></div>
                         </div>
                     @endfor 
                 </div> 
@@ -1133,24 +1128,20 @@ async function refreshCalendarNotifications() {
 
         dayElements.forEach((dayEl) => {
             const day = dayEl.dataset.day;
-            const count = Number(data[day] ?? 0);
+            const dayCounts = data[day] ?? {};
+            const altCount = Number(dayCounts.alternative ?? 0);
+            const formativeCount = Number(dayCounts.formative ?? 0);
+            const longTestCount = Number(dayCounts.long_test ?? 0);
             const dayNumber = dayEl.querySelector('.calendar-day-number')?.textContent || day;
 
-            if (count <= 0) {
-                dayEl.innerHTML = `<span class="calendar-day-number">${dayNumber}</span>`;
-                return;
-            }
-
-            let dot = '<span class="h-2 w-2 bg-blue-500 rounded-full"></span>';
-            if (count >= 3) {
-                dot = '<span class="h-2 w-2 bg-red-500 rounded-full"></span>';
-            } else if (count >= 2) {
-                dot = '<span class="h-2 w-2 bg-yellow-500 rounded-full"></span>';
-            }
+            const dots = [];
+            for (let i = 0; i < altCount; i++) dots.push('<span class="calendar-dot dot-alternative"></span>');
+            for (let i = 0; i < formativeCount; i++) dots.push('<span class="calendar-dot dot-formative"></span>');
+            for (let i = 0; i < longTestCount; i++) dots.push('<span class="calendar-dot dot-longtest"></span>');
 
             dayEl.innerHTML = `
                 <span class="calendar-day-number">${dayNumber}</span>
-                <div class="flex gap-1 justify-center">${dot}</div>
+                <div class="calendar-day-dots">${dots.join('')}</div>
             `;
         });
     } catch (error) {
@@ -1632,9 +1623,7 @@ if (document.readyState === 'loading') {
 renderTeacherSubjectTypeOptions();
 renderTeacherSubjectOptions();
 renderTeacherSectionOptions();
-if (userRole === 'teacher') {
-    refreshCalendarNotifications();
-}
+refreshCalendarNotifications();
     </script>
     <div id="panelOverlay" class="panel-overlay" onclick="closeAllPanels()"></div>
     

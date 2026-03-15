@@ -106,6 +106,22 @@ select {
   margin-bottom: 20px;
 }
 
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr); /* Ensures 7 equal columns */
@@ -130,6 +146,28 @@ select {
     padding: 10px;
     cursor: pointer;
 }
+
+.calendar-day-dots {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 42px;
+    justify-content: flex-end;
+}
+
+.calendar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    display: inline-block;
+}
+
+.dot-alternative { background: #7c3aed; }
+.dot-formative { background: #3b82f6; }
+.dot-longtest { background: #10b981; }
 
 /* Calendar Day Hover Effect */
 .calendar-day:not(.empty):hover {
