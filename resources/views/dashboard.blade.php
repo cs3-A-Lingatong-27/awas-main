@@ -8,7 +8,9 @@
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/build-placeholder.js'])
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}">
-    <link rel="icon" type="image/png" href="{{ asset('pshs.png') }}">
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 </head>
 <body class="antialiased text-slate-900" style="font-family: 'Plus Jakarta Sans', sans-serif;">
 <div class="relative min-h-screen overflow-hidden bg-slate-100">
@@ -255,7 +257,7 @@
 
                         <div class="form-group mb-6">
                             <label class="block mb-1">Temporary Password</label>
-                            <input type="password" name="password" class="w-full border p-2 rounded" required value="PSHS_2026">
+                            <input type="password" name="password" class="w-full border p-2 rounded" required placeholder="Set a temporary password">
                         </div>
 
                         <button type="submit" class="bg-blue-700 text-white w-full py-3 rounded-lg font-bold hover:bg-blue-800 transition">
@@ -294,6 +296,13 @@
                         </div>
 
                         <div class="form-group mb-6">
+                            <label class="block mb-2">Grade 10-12 Assignment Type</label>
+                            <div id="teacherSubjectTypeContainer" class="grid grid-cols-1 gap-3 rounded border border-gray-200 p-3">
+                                <p class="text-sm text-gray-500">Select Grade 10, 11, or 12 first.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-6">
                             <label class="block mb-2">Assigned Subjects</label>
                             <div id="teacherSubjectContainer" class="grid grid-cols-2 gap-2 rounded border border-gray-200 p-3">
                                 <p class="col-span-2 text-sm text-gray-500">Select one or more grade levels first.</p>
@@ -309,7 +318,7 @@
 
                         <div class="form-group mb-6">
                             <label class="block mb-1">Temporary Password</label>
-                            <input type="password" name="password" class="w-full border p-2 rounded" required value="PSHS_2026">
+                            <input type="password" name="password" class="w-full border p-2 rounded" required placeholder="Set a temporary password">
                         </div>
 
                         <button type="submit" class="bg-emerald-700 text-white w-full py-3 rounded-lg font-bold hover:bg-emerald-800 transition">
@@ -512,6 +521,28 @@ const fallbackSubjects = [
 
 function getSubjectsForGrade(grade) {
     return subjectsByGrade[grade] ?? fallbackSubjects;
+}
+
+function getTeacherTypeOptionsForGrade(grade) {
+    if (grade === 10) return ['elective'];
+    if (grade === 11 || grade === 12) return ['science_core', 'elective'];
+    return [];
+}
+
+function getTeacherTypeLabel(type) {
+    if (type === 'science_core') return 'Science Core';
+    if (type === 'elective') return 'Elective';
+    return type;
+}
+
+function getTeacherSubjectsByGradeAndType(grade, type) {
+    return subjectCatalog
+        .filter((subject) =>
+            Number(subject.grade_level_start) <= grade &&
+            Number(subject.grade_level_end) >= grade &&
+            subject.type === type
+        )
+        .map((subject) => subject.name);
 }
 
 function showRoleFlash(message, backgroundColor = '#2563eb') {
@@ -1127,6 +1158,67 @@ async function refreshCalendarNotifications() {
     }
 }
 
+function renderTeacherSubjectTypeOptions() {
+    const teacherForm = document.getElementById('teacherEnrollmentForm');
+    const typeContainer = document.getElementById('teacherSubjectTypeContainer');
+
+    if (!teacherForm || !typeContainer) return;
+
+    const selectedGradeInputs = teacherForm.querySelectorAll('input[name="assigned_grades[]"]:checked');
+    const selectedGrades = Array.from(selectedGradeInputs).map((input) => parseInt(input.value, 10));
+    const selectedUpperGrades = selectedGrades.filter((grade) => [10, 11, 12].includes(grade));
+    const previousSelections = {};
+
+    selectedUpperGrades.forEach((grade) => {
+        const selectedTypes = teacherForm.querySelectorAll(`input[name="teacher_subject_groups[${grade}][]"]:checked`);
+        previousSelections[grade] = new Set(Array.from(selectedTypes).map((input) => input.value));
+    });
+
+    if (selectedUpperGrades.length === 0) {
+        typeContainer.innerHTML = '<p class="text-sm text-gray-500">Select Grade 10, 11, or 12 first.</p>';
+        return;
+    }
+
+    typeContainer.innerHTML = '';
+
+    selectedUpperGrades.forEach((grade) => {
+        const gradeBlock = document.createElement('div');
+        gradeBlock.className = 'rounded border border-gray-200 p-2';
+
+        const title = document.createElement('p');
+        title.className = 'text-sm font-semibold text-gray-700 mb-2';
+        title.textContent = `Grade ${grade}`;
+        gradeBlock.appendChild(title);
+
+        const optionsWrap = document.createElement('div');
+        optionsWrap.className = 'flex flex-wrap gap-3';
+
+        getTeacherTypeOptionsForGrade(grade).forEach((type) => {
+            const label = document.createElement('label');
+            label.className = 'inline-flex items-center gap-2 text-sm';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.name = `teacher_subject_groups[${grade}][]`;
+            input.value = type;
+            input.className = 'rounded border-gray-300';
+            if (previousSelections[grade]?.has(type)) {
+                input.checked = true;
+            }
+
+            const span = document.createElement('span');
+            span.textContent = getTeacherTypeLabel(type);
+
+            label.appendChild(input);
+            label.appendChild(span);
+            optionsWrap.appendChild(label);
+        });
+
+        gradeBlock.appendChild(optionsWrap);
+        typeContainer.appendChild(gradeBlock);
+    });
+}
+
 function renderTeacherSubjectOptions() {
     const teacherForm = document.getElementById('teacherEnrollmentForm');
     const subjectContainer = document.getElementById('teacherSubjectContainer');
@@ -1144,8 +1236,27 @@ function renderTeacherSubjectOptions() {
         return;
     }
 
-    const subjectPool = [...new Set(selectedGrades.flatMap((grade) => getSubjectsForGrade(grade)))];
+    const subjectPool = [...new Set(selectedGrades.flatMap((grade) => {
+        if (grade <= 9) {
+            return getSubjectsForGrade(grade);
+        }
+
+        const selectedTypes = Array.from(
+            teacherForm.querySelectorAll(`input[name="teacher_subject_groups[${grade}][]"]:checked`)
+        ).map((input) => input.value);
+
+        if (selectedTypes.length === 0) {
+            return [];
+        }
+
+        return [...new Set(selectedTypes.flatMap((type) => getTeacherSubjectsByGradeAndType(grade, type)))];
+    }))];
     subjectContainer.innerHTML = '';
+
+    if (subjectPool.length === 0) {
+        subjectContainer.innerHTML = '<p class="col-span-2 text-sm text-gray-500">Select at least one assignment type for Grade 10-12 to show subjects.</p>';
+        return;
+    }
 
     subjectPool.forEach((subjectName) => {
         const label = document.createElement('label');
@@ -1448,10 +1559,16 @@ function initSchedulingAssessmentPanel() {
 }
 
 const teacherGradeCheckboxes = document.querySelectorAll('#teacherEnrollmentForm input[name="assigned_grades[]"]');
+const teacherSubjectTypeContainer = document.getElementById('teacherSubjectTypeContainer');
 teacherGradeCheckboxes.forEach((checkbox) => {
+    checkbox.addEventListener('change', renderTeacherSubjectTypeOptions);
     checkbox.addEventListener('change', renderTeacherSubjectOptions);
     checkbox.addEventListener('change', renderTeacherSectionOptions);
 });
+
+if (teacherSubjectTypeContainer) {
+    teacherSubjectTypeContainer.addEventListener('change', renderTeacherSubjectOptions);
+}
 
 const calendarDayElements = document.querySelectorAll('.calendar-day[data-day]');
 calendarDayElements.forEach((dayEl) => {
@@ -1512,6 +1629,7 @@ if (document.readyState === 'loading') {
     showScholarPanelTab('profile');
 }
 
+renderTeacherSubjectTypeOptions();
 renderTeacherSubjectOptions();
 renderTeacherSectionOptions();
 if (userRole === 'teacher') {

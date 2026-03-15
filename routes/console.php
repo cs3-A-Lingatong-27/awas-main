@@ -4,7 +4,9 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command('app:send-weekly-teacher-summaries')->weeklyOn(1, '08:00');
+Schedule::command('app:send-weekly-teacher-summaries')
+    ->weeklyOn(1, '04:00')
+    ->timezone(config('app.timezone'));
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

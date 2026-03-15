@@ -277,7 +277,7 @@ Route::get('/api/assessments-by-date', function (Request $request) {
             $allowed = $subjectCatalog[$gradeLevel][$type] ?? [];
             $selected = $selectedSubjectsByType[$type];
             if (empty($allowed)) {
-                // Placeholder mode: list not provided yet for this group/grade.
+                // Allow empty catalog buckets (e.g., regular list not yet finalized).
                 continue;
             }
             if (empty($selected)) {
@@ -385,6 +385,68 @@ Route::get('/api/assessments-by-date', function (Request $request) {
             11 => ['Mars', 'Mercury', 'Venus'],
             12 => ['Orosa', 'Del Mundo', 'Zara'],
         ];
+        $teacherSubjectCatalog = [
+            10 => [
+                'elective' => [
+                    'Philippine Biodiversity',
+                    'Field Sampling',
+                    'Astronomy',
+                    'Philosophy of Science',
+                ],
+            ],
+            11 => [
+                'elective' => [
+                    'Biology 3 Level 1',
+                    'Biology 3 Level 2',
+                    'Chemistry 3 Level 1',
+                    'Chemistry 3 Level 2',
+                    'Physics 3 Level 1',
+                    'Physics 3 Level 2',
+                    'Computer Science 5 Level 1',
+                    'Computer Science 5 Level 2',
+                    'Design and Make Technology 1 Level 1',
+                    'Design and Make Technology 1 Level 2',
+                    'Engineering 1 Level 1',
+                    'Engineering 1 Level 2',
+                    'Agriculture 1 Level 1',
+                    'Agriculture 1 Level 2',
+                ],
+                'science_core' => [
+                    'Physics 3 Level 1',
+                    'Physics 3 Level 2',
+                    'Biology 3 Level 1',
+                    'Biology 3 Level 2',
+                    'Chemistry 3 Level 1',
+                    'Chemistry 3 Level 2',
+                ],
+            ],
+            12 => [
+                'elective' => [
+                    'Biology 3 Level 1',
+                    'Biology 3 Level 2',
+                    'Chemistry 3 Level 1',
+                    'Chemistry 3 Level 2',
+                    'Physics 3 Level 1',
+                    'Physics 3 Level 2',
+                    'Computer Science 5 Level 1',
+                    'Computer Science 5 Level 2',
+                    'Design and Make Technology 1 Level 1',
+                    'Design and Make Technology 1 Level 2',
+                    'Engineering 1 Level 1',
+                    'Engineering 1 Level 2',
+                    'Agriculture 1 Level 1',
+                    'Agriculture 1 Level 2',
+                ],
+                'science_core' => [
+                    'Physics 4 Level 1',
+                    'Physics 4 Level 2',
+                    'Biology 4 Level 1',
+                    'Biology 4 Level 2',
+                    'Chemistry 4 Level 1',
+                    'Chemistry 4 Level 2',
+                ],
+            ],
+        ];
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -392,6 +454,9 @@ Route::get('/api/assessments-by-date', function (Request $request) {
             'password' => 'required|min:8',
             'assigned_grades' => 'required|array|min:1',
             'assigned_grades.*' => 'integer|in:7,8,9,10,11,12',
+            'teacher_subject_groups' => 'nullable|array',
+            'teacher_subject_groups.*' => 'array',
+            'teacher_subject_groups.*.*' => 'string|in:science_core,elective',
             'assigned_subjects' => 'required|array|min:1',
             'assigned_subjects.*' => 'string|max:100',
             'assigned_sections' => 'required|array|min:1',
@@ -401,6 +466,33 @@ Route::get('/api/assessments-by-date', function (Request $request) {
         $assignedSubjects = array_values(array_unique($validated['assigned_subjects']));
         $assignedGrades = array_map('intval', array_values(array_unique($validated['assigned_grades'])));
         $assignedSections = array_values(array_unique($validated['assigned_sections']));
+        $teacherSubjectGroupsInput = $validated['teacher_subject_groups'] ?? [];
+        $teacherSubjectGroups = [];
+
+        foreach ($assignedGrades as $grade) {
+            if (!in_array($grade, [10, 11, 12], true)) {
+                continue;
+            }
+
+            $allowedTypes = $grade === 10 ? ['elective'] : ['science_core', 'elective'];
+            $selectedTypes = $teacherSubjectGroupsInput[$grade] ?? [];
+            $selectedTypes = is_array($selectedTypes) ? array_values(array_unique($selectedTypes)) : [];
+
+            $invalidTypes = array_diff($selectedTypes, $allowedTypes);
+            if (!empty($invalidTypes)) {
+                return back()->withErrors([
+                    'teacher_subject_groups' => "Invalid assignment type selected for Grade {$grade}.",
+                ])->withInput();
+            }
+
+            if (empty($selectedTypes)) {
+                return back()->withErrors([
+                    'teacher_subject_groups' => "Select at least one assignment type for Grade {$grade}.",
+                ])->withInput();
+            }
+
+            $teacherSubjectGroups[$grade] = $selectedTypes;
+        }
 
         $allowedSections = [];
         foreach ($assignedGrades as $grade) {
@@ -414,13 +506,45 @@ Route::get('/api/assessments-by-date', function (Request $request) {
             ])->withInput();
         }
 
-        if (in_array(7, $assignedGrades, true)) {
+        if (count($assignedGrades) === 1 && in_array(7, $assignedGrades, true)) {
             $invalidGrade7Subjects = array_diff($assignedSubjects, $gradeSubjectMap[7]);
             if (!empty($invalidGrade7Subjects)) {
                 return back()->withErrors([
                     'assigned_subjects' => 'For Grade 7, use only the official Grade 7 subject list.',
                 ])->withInput();
             }
+        }
+
+        $allUpperCatalogSubjects = [];
+        $allowedUpperSubjects = [];
+        foreach ([10, 11, 12] as $grade) {
+            foreach (($teacherSubjectCatalog[$grade] ?? []) as $type => $subjects) {
+                $allUpperCatalogSubjects = array_merge($allUpperCatalogSubjects, $subjects);
+
+                if (in_array($grade, $assignedGrades, true) && in_array($type, $teacherSubjectGroups[$grade] ?? [], true)) {
+                    $allowedUpperSubjects = array_merge($allowedUpperSubjects, $subjects);
+                }
+            }
+        }
+        $allUpperCatalogSubjects = array_values(array_unique($allUpperCatalogSubjects));
+        $allowedUpperSubjects = array_values(array_unique($allowedUpperSubjects));
+
+        $selectedUpperSubjects = array_values(array_unique(array_filter(
+            $assignedSubjects,
+            fn(string $subject) => in_array($subject, $allUpperCatalogSubjects, true)
+        )));
+
+        if (!empty(array_intersect($assignedGrades, [10, 11, 12])) && empty($selectedUpperSubjects)) {
+            return back()->withErrors([
+                'assigned_subjects' => 'Select at least one Grade 10-12 subject based on the chosen assignment type(s).',
+            ])->withInput();
+        }
+
+        $invalidUpperSubjects = array_diff($selectedUpperSubjects, $allowedUpperSubjects);
+        if (!empty($invalidUpperSubjects)) {
+            return back()->withErrors([
+                'assigned_subjects' => 'Selected Grade 10-12 subject(s) do not match the chosen assignment type(s).',
+            ])->withInput();
         }
 
         User::create([

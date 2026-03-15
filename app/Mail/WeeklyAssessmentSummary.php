@@ -16,10 +16,19 @@ class WeeklyAssessmentSummary extends Mailable
     /**
      * Create a new message instance.
      */
-    public function __construct(public $assessments, public $teacherName) {}
+    public function __construct(
+        public $groupedSummary,
+        public $handledClasses,
+        public $classesWithAssessments,
+        public $assignedSubjects,
+        public $scopeAssessmentList,
+        public $teacherName,
+        public $weekStart,
+        public $weekEnd
+    ) {}
 
 public function envelope(): Envelope {
-    return new Envelope(subject: 'Upcoming Assessments for Next Week');
+    return new Envelope(subject: 'Weekly Assessment Summary (Monday-Friday)');
 }
 
 public function content(): Content {

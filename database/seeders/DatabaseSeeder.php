@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call([
-            Grade1012PlaceholdersSeeder::class,
+            Grade1012CatalogSeeder::class,
         ]);
     }
 }
