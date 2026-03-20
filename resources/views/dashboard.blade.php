@@ -466,7 +466,7 @@
 
             <div class="rounded-lg border border-gray-200 bg-white p-4 mt-3">
                 <h4 class="font-semibold text-slate-800 mb-2">Feedback</h4>
-                <a href="https://bit.ly/awasfeedback" target="_blank" rel="noopener noreferrer" class="text-blue-700 font-semibold hover:underline">
+                <a href="https://forms.gle/x6s7cxEmCgnKZTxU6" target="_blank" rel="noopener noreferrer" class="text-blue-700 font-semibold hover:underline">
                     Open Feedback Survey
                 </a>
             </div>
