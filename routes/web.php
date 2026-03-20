@@ -368,6 +368,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $grade = $request->query('grade_level');
         $section = $request->query('section');
         $subject = $request->query('subject');
+        $title = $request->query('title');
         $types = $request->query('types');
         $typeFilters = is_string($types) && $types !== '' ? array_filter(array_map('trim', explode(',', $types))) : [];
 
@@ -391,6 +392,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $q->where('section', $section)
                   ->orWhere('description', 'like', '%Section: ' . $section . '%');
             });
+        }
+
+        if ($title !== null && $title !== '') {
+            $query->where('title', 'like', '%' . $title . '%');
         }
 
         if ($subject !== null && $subject !== '') {

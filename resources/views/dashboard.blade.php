@@ -72,6 +72,10 @@
                     </select>
                 </div>
                 <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Title Search</label>
+                    <input id="adminAssessmentTitleFilter" type="text" class="w-full border p-2 rounded text-sm admin-filter-select" placeholder="Search title...">
+                </div>
+                <div>
                     <label class="block text-xs font-semibold text-gray-600 mb-1">Subject Type</label>
                     <div class="flex flex-wrap gap-3 text-xs">
                         <label class="inline-flex items-center gap-2">
@@ -629,31 +633,72 @@ const subjectsByGrade = {
         "Physics 4 Elective"
     ],
 };
+const regularSubjectsByGrade = {
+    10: [
+        "Biology 2",
+        "Chemistry 2",
+        "Physics 2",
+        "Mathematics 4",
+        "English 4",
+        "Filipino 4",
+        "Social Science 4",
+        "Physical Education 4",
+        "Health 4",
+        "Music 4",
+        "Values Education 4",
+        "STEM Research 1",
+        "Computer Science 4"
+    ],
+    11: [
+        "Mathematics 5",
+        "English 5",
+        "Filipino 5",
+        "Social Science 5",
+        "STEM Research 2",
+        "Computer Science 5"
+    ],
+    12: [
+        "Mathematics 6",
+        "English 6",
+        "Filipino 6",
+        "Social Science 6",
+        "STEM Research 3",
+        "Computer Science 5"
+    ]
+};
 
 function getSubjectsForGrade(grade) {
     return subjectsByGrade[grade] ?? [];
 }
 
 function getTeacherTypeOptionsForGrade(grade) {
-    if (grade === 10) return ['elective'];
-    if (grade === 11 || grade === 12) return ['science_core', 'elective'];
+    if (grade === 10) return ['regular', 'elective'];
+    if (grade === 11 || grade === 12) return ['regular', 'science_core', 'elective'];
     return [];
 }
 
 function getTeacherTypeLabel(type) {
+    if (type === 'regular') return 'Regular';
     if (type === 'science_core') return 'Science Core';
     if (type === 'elective') return 'Elective';
     return type;
 }
 
 function getTeacherSubjectsByGradeAndType(grade, type) {
-    return subjectCatalog
+    const normalizedType = type === 'regular' ? 'core' : type;
+    const results = subjectCatalog
         .filter((subject) =>
             Number(subject.grade_level_start) <= grade &&
             Number(subject.grade_level_end) >= grade &&
-            subject.type === type
+            subject.type === normalizedType
         )
         .map((subject) => subject.name);
+
+    if (results.length === 0 && normalizedType === 'core') {
+        return regularSubjectsByGrade[grade] ?? [];
+    }
+
+    return results;
 }
 
 function showRoleFlash(message, backgroundColor = '#2563eb') {
@@ -751,6 +796,7 @@ async function handleChoice(action) {
         document.getElementById('hiddenDate').value = tempDate;
         document.getElementById('assessmentPanel').classList.add('open');
         document.getElementById('panelOverlay').classList.add('active');
+        document.body.classList.add('overflow-hidden');
         updateAssessmentSubjectOptions();
         updateAssessmentSectionOptions();
         syncAssessmentSectionState();
@@ -768,6 +814,7 @@ async function handleChoice(action) {
         document.getElementById('viewPanelDateTitle').innerText = "Assessments on " + tempDateString;
         document.getElementById('viewPanel').classList.add('open');
         document.getElementById('panelOverlay').classList.add('active');
+        document.body.classList.add('overflow-hidden');
         
         listContainer.innerHTML = '<p class="text-blue-500 italic p-4">Loading assessments...</p>';
 
@@ -833,6 +880,7 @@ const teacherCalendarSubjectFilter = document.getElementById('teacherCalendarSub
     const adminAssessmentGradeFilter = document.getElementById('adminAssessmentGradeFilter');
     const adminAssessmentSectionFilter = document.getElementById('adminAssessmentSectionFilter');
     const adminAssessmentSubjectFilter = document.getElementById('adminAssessmentSubjectFilter');
+    const adminAssessmentTitleFilter = document.getElementById('adminAssessmentTitleFilter');
     const adminTypeScienceCore = document.getElementById('adminTypeScienceCore');
     const adminTypeElective = document.getElementById('adminTypeElective');
     const adminAssessmentsApplyFilters = document.getElementById('adminAssessmentsApplyFilters');
@@ -924,7 +972,8 @@ function applyRescheduleFields() {
 
     const gradeSelect = document.getElementById('gradeSelect');
     const subjectSelect = document.getElementById('subjectSelect');
-    const sectionSelect = document.getElementById('sectionSelect');
+    const sectionChecklist = document.getElementById('sectionChecklist');
+    const sectionHidden = document.getElementById('sectionHidden');
     const typeSelect = document.getElementById('assessmentTypeSelect');
     const titleInput = document.querySelector('#assessmentPanel input[name="title"]');
 
@@ -979,27 +1028,26 @@ function applyRescheduleFields() {
         subjectSelect.value = pendingReschedule.subject;
         subjectSelect.disabled = true;
     }
-    if (sectionSelect) {
-        if (pendingReschedule.section) {
-            const sectionExists = Array.from(sectionSelect.options).some((opt) => opt.value === pendingReschedule.section);
-            if (!sectionExists) {
-                const option = document.createElement('option');
-                option.value = pendingReschedule.section;
-                option.textContent = pendingReschedule.section;
-                sectionSelect.appendChild(option);
-            }
-            sectionSelect.value = pendingReschedule.section;
-        } else {
-            sectionSelect.value = '';
-        }
-        sectionSelect.disabled = true;
+    if (sectionChecklist) {
+        const selectedSections = pendingReschedule.section
+            ? pendingReschedule.section.split(',').map((s) => s.trim()).filter(Boolean)
+            : [];
+        sectionChecklist.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+            input.checked = selectedSections.includes(input.value);
+            input.disabled = true;
+        });
+    }
+    if (sectionHidden) {
+        sectionHidden.value = pendingReschedule.section ?? '';
+        sectionHidden.disabled = true;
     }
 }
 
 function clearRescheduleFields() {
     const gradeSelect = document.getElementById('gradeSelect');
     const subjectSelect = document.getElementById('subjectSelect');
-    const sectionSelect = document.getElementById('sectionSelect');
+    const sectionChecklist = document.getElementById('sectionChecklist');
+    const sectionHidden = document.getElementById('sectionHidden');
     const typeSelect = document.getElementById('assessmentTypeSelect');
     const titleInput = document.querySelector('#assessmentPanel input[name="title"]');
 
@@ -1027,9 +1075,15 @@ function clearRescheduleFields() {
         subjectSelect.disabled = false;
         subjectSelect.selectedIndex = 0;
     }
-    if (sectionSelect) {
-        sectionSelect.disabled = false;
-        sectionSelect.selectedIndex = 0;
+    if (sectionChecklist) {
+        sectionChecklist.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+            input.checked = false;
+            input.disabled = false;
+        });
+    }
+    if (sectionHidden) {
+        sectionHidden.disabled = false;
+        sectionHidden.value = '';
     }
     if (typeSelect) typeSelect.disabled = false;
 }
@@ -1200,12 +1254,14 @@ function buildAdminAssessmentParams() {
     const grade = adminAssessmentGradeFilter ? adminAssessmentGradeFilter.value : '';
     const section = adminAssessmentSectionFilter ? adminAssessmentSectionFilter.value : '';
     const subject = adminAssessmentSubjectFilter ? adminAssessmentSubjectFilter.value : '';
+    const title = adminAssessmentTitleFilter ? adminAssessmentTitleFilter.value.trim() : '';
     const types = buildAdminFilterTypes();
 
     if (grade) params.set('grade_level', grade);
     if (section) params.set('section', section);
     if (subject) params.set('subject', subject);
     if (types.length > 0) params.set('types', types.join(','));
+    if (title) params.set('title', title);
 
     return params;
 }
@@ -1509,6 +1565,10 @@ function renderTeacherSubjectTypeOptions() {
             input.className = 'rounded border-gray-300';
             if (previousSelections[grade]?.has(type)) {
                 input.checked = true;
+            } else if (!previousSelections[grade] || previousSelections[grade]?.size === 0) {
+                if (type === 'regular') {
+                    input.checked = true;
+                }
             }
 
             const span = document.createElement('span');
@@ -1676,35 +1736,53 @@ function updateAssessmentSubjectOptions() {
 
 function updateAssessmentSectionOptions() {
     const gradeSelect = document.getElementById('gradeSelect');
-    const sectionSelect = document.getElementById('sectionSelect');
-    if (!gradeSelect || !sectionSelect) return;
+    const sectionChecklist = document.getElementById('sectionChecklist');
+    const sectionHidden = document.getElementById('sectionHidden');
+    if (!gradeSelect || !sectionChecklist || !sectionHidden) return;
 
     const selectedGrade = String(gradeSelect.value || '');
     const sections = sectionsByGrade[selectedGrade] ?? [];
+    let filteredSections = sections;
 
-    sectionSelect.innerHTML = '';
-    if (!selectedGrade || sections.length === 0) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'Select a grade first';
-        option.disabled = true;
-        option.selected = true;
-        sectionSelect.appendChild(option);
+    if (userRole === 'teacher') {
+        const teacherSections = @json(collect(explode(',', (string) auth()->user()->section))
+            ->map(fn($s) => trim($s))
+            ->filter()
+            ->values()
+            ->all());
+        if (Array.isArray(teacherSections) && teacherSections.length > 0) {
+            filteredSections = sections.filter((section) => teacherSections.includes(section));
+        }
+    }
+
+    sectionChecklist.innerHTML = '';
+    sectionHidden.value = '';
+
+    if (!selectedGrade || filteredSections.length === 0) {
+        sectionChecklist.innerHTML = `<span class="col-span-2 text-xs text-gray-500">${selectedGrade ? 'No assigned sections for this grade' : 'Select a grade first'}</span>`;
         return;
     }
 
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Select Section';
-    placeholder.disabled = true;
-    placeholder.selected = true;
-    sectionSelect.appendChild(placeholder);
+    filteredSections.forEach((section) => {
+        const label = document.createElement('label');
+        label.className = 'inline-flex items-center gap-2 text-sm';
 
-    sections.forEach((section) => {
-        const option = document.createElement('option');
-        option.value = section;
-        option.textContent = section;
-        sectionSelect.appendChild(option);
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = section;
+        input.className = 'rounded border-gray-300';
+
+        input.addEventListener('change', () => {
+            const selected = Array.from(sectionChecklist.querySelectorAll('input[type="checkbox"]:checked')).map((i) => i.value);
+            sectionHidden.value = selected.join(', ');
+        });
+
+        const span = document.createElement('span');
+        span.textContent = section;
+
+        label.appendChild(input);
+        label.appendChild(span);
+        sectionChecklist.appendChild(label);
     });
 }
 
@@ -1728,20 +1806,24 @@ function shouldDisableSectionForSubject(subjectName, grade) {
 function syncAssessmentSectionState() {
     const gradeSelect = document.getElementById('gradeSelect');
     const subjectSelect = document.getElementById('subjectSelect');
-    const sectionSelect = document.getElementById('sectionSelect');
+    const sectionChecklist = document.getElementById('sectionChecklist');
+    const sectionHidden = document.getElementById('sectionHidden');
     const sectionHint = document.getElementById('sectionRuleHint');
 
-    if (!gradeSelect || !subjectSelect || !sectionSelect || !sectionHint) return;
+    if (!gradeSelect || !subjectSelect || !sectionChecklist || !sectionHint || !sectionHidden) return;
 
     const selectedGrade = gradeSelect.value;
     const selectedSubject = subjectSelect.value;
     const disableSection = shouldDisableSectionForSubject(selectedSubject, selectedGrade);
 
-    sectionSelect.disabled = disableSection;
-    sectionSelect.required = !disableSection;
+    sectionChecklist.classList.toggle('opacity-60', disableSection);
+    sectionChecklist.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+        input.disabled = disableSection;
+    });
+    sectionHidden.disabled = disableSection;
 
     if (disableSection) {
-        sectionSelect.value = '';
+        sectionHidden.value = '';
         sectionHint.classList.remove('hidden');
         sectionHint.textContent = 'Section selection is disabled for this subject and grade.';
     } else {
@@ -1759,6 +1841,7 @@ function syncAssessmentSectionState() {
         function closeAllPanels() {
             document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('open'));
             document.getElementById('panelOverlay').classList.remove('active');
+            document.body.classList.remove('overflow-hidden');
         }
 
         function showScholarPanelTab(tabName) {
@@ -1856,6 +1939,26 @@ function initSchedulingAssessmentPanel() {
     const assessmentSubjectSelect = document.getElementById('subjectSelect');
     if (assessmentSubjectSelect) {
         assessmentSubjectSelect.addEventListener('change', syncAssessmentSectionState);
+    }
+
+    const assessmentForm = document.querySelector('#assessmentPanel form');
+    if (assessmentForm) {
+        assessmentForm.addEventListener('submit', (event) => {
+            const sectionHidden = document.getElementById('sectionHidden');
+            const subjectSelect = document.getElementById('subjectSelect');
+            const gradeSelect = document.getElementById('gradeSelect');
+            if (!sectionHidden || !subjectSelect || !gradeSelect) return;
+
+            const disableSection = shouldDisableSectionForSubject(subjectSelect.value, gradeSelect.value);
+            if (disableSection) {
+                return;
+            }
+
+            if (!sectionHidden.value || sectionHidden.value.trim() === '') {
+                event.preventDefault();
+                showRoleFlash('Select at least one section for this assessment.', '#dc2626');
+            }
+        });
     }
 
     updateAssessmentSubjectOptions();
@@ -2135,6 +2238,10 @@ if (adminAssessmentSubjectFilter) {
     adminAssessmentSubjectFilter.addEventListener('change', scheduleAdminAssessmentsReload);
 }
 
+if (adminAssessmentTitleFilter) {
+    adminAssessmentTitleFilter.addEventListener('input', scheduleAdminAssessmentsReload);
+}
+
 window.addEventListener('scroll', hideHoverCard, { passive: true });
 window.addEventListener('resize', hideHoverCard);
 
@@ -2243,6 +2350,7 @@ refreshCalendarNotifications();
             <input type="hidden" name="subject" id="rescheduleSubjectHidden" disabled>
             <input type="hidden" name="type" id="rescheduleTypeHidden" disabled>
             <input type="hidden" name="section" id="rescheduleSectionHidden" disabled>
+            <input type="hidden" name="section" id="sectionHidden">
             <input type="hidden" name="due_date" id="hiddenDate">
 
             <div class="form-group mb-4">
@@ -2281,9 +2389,9 @@ refreshCalendarNotifications();
 
             <div class="form-group mb-4">
                 <label class="block text-sm font-bold text-gray-700 mb-1">Section</label>
-                <select name="section" id="sectionSelect" class="w-full p-2 border rounded border-gray-300 bg-gray-50" required>
-                    <option value="">Select a grade first</option>
-                </select>
+                <div id="sectionChecklist" class="grid grid-cols-2 gap-2 rounded border border-gray-300 bg-gray-50 p-2 text-sm">
+                    <span class="col-span-2 text-xs text-gray-500">Select a grade first</span>
+                </div>
                 <p id="sectionRuleHint" class="hidden text-xs mt-1 text-blue-600"></p>
             </div>
 

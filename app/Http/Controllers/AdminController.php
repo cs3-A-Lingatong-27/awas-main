@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\StudentGradeSection;
+use App\Models\StudentSubject;
 use App\Models\User;
 
 class AdminController extends Controller
@@ -54,6 +55,117 @@ public function storeStudent(Request $request)
         'grade_level' => $gradeLevel,
         'section' => $request->section,
     ]);
+
+    $regularSubjectsByGrade = [
+        7 => [
+            'Integrated Science 1',
+            'Mathematics 1',
+            'English 1',
+            'Filipino 1',
+            'Social Science 1',
+            'Physical Education 1',
+            'Health 1',
+            'Music 1',
+            'Values Education 1',
+            'AdTech 1',
+            'Computer Science 1',
+        ],
+        8 => [
+            'Biology 1',
+            'Chemistry 1',
+            'Physics 1',
+            'Mathematics 2',
+            'Mathematics 3',
+            'Earth Science',
+            'English 2',
+            'Filipino 2',
+            'Social Science 2',
+            'Physical Education 2',
+            'Health 2',
+            'Music 2',
+            'Values Education 2',
+            'AdTech 2',
+            'Computer Science 2',
+        ],
+        9 => [
+            'Biology 1',
+            'Chemistry 1',
+            'Physics 1',
+            'Mathematics 3',
+            'English 3',
+            'Filipino 3',
+            'Social Science 3',
+            'Physical Education 3',
+            'Health 3',
+            'Music 3',
+            'Values Education 3',
+            'Statistics 1',
+            'Computer Science 3',
+        ],
+        10 => [
+            'Biology 2',
+            'Chemistry 2',
+            'Physics 2',
+            'Mathematics 4',
+            'English 4',
+            'Filipino 4',
+            'Social Science 4',
+            'Physical Education 4',
+            'Health 4',
+            'Music 4',
+            'Values Education 4',
+            'STEM Research 1',
+            'Computer Science 4',
+        ],
+        11 => [
+            'Mathematics 5',
+            'English 5',
+            'Filipino 5',
+            'Social Science 5',
+            'STEM Research 2',
+            'Computer Science 5',
+        ],
+        12 => [
+            'Mathematics 6',
+            'English 6',
+            'Filipino 6',
+            'Social Science 6',
+            'STEM Research 3',
+            'Computer Science 5',
+        ],
+    ];
+
+    $selectedSubjects = $request->input('selected_subjects', []);
+    $subjectRows = [];
+
+    foreach ($regularSubjectsByGrade[$gradeLevel] ?? [] as $subjectName) {
+        $subjectRows["regular|{$subjectName}"] = [
+            'user_id' => $student->id,
+            'grade_level' => $gradeLevel,
+            'subject_name' => $subjectName,
+            'subject_type' => 'regular',
+        ];
+    }
+
+    foreach (['elective', 'science_core'] as $group) {
+        $items = $selectedSubjects[$group] ?? [];
+        if (!is_array($items)) {
+            continue;
+        }
+        foreach ($items as $subjectName) {
+            $key = "{$group}|{$subjectName}";
+            $subjectRows[$key] = [
+                'user_id' => $student->id,
+                'grade_level' => $gradeLevel,
+                'subject_name' => $subjectName,
+                'subject_type' => $group,
+            ];
+        }
+    }
+
+    foreach ($subjectRows as $row) {
+        StudentSubject::create($row);
+    }
 
     if ($gradeLevel >= 7 && $gradeLevel <= 9) {
         StudentGradeSection::updateOrCreate(
@@ -189,10 +301,13 @@ public function storeTeacher(Request $request)
         'assigned_grades.*' => 'integer|in:7,8,9,10,11,12',
         'assigned_subjects' => 'required|array|min:1',
         'assigned_subjects.*' => 'string|max:100',
+        'assigned_sections' => 'nullable|array',
+        'assigned_sections.*' => 'string|max:100',
     ]);
 
     $assignedSubjects = array_values(array_unique($validated['assigned_subjects']));
     $assignedGrades = array_map('intval', array_values(array_unique($validated['assigned_grades'])));
+    $assignedSections = array_values(array_unique($validated['assigned_sections'] ?? []));
 
     // Temporarily allow Grade 7 subject selection to avoid blocking enrollment.
 
@@ -203,6 +318,7 @@ public function storeTeacher(Request $request)
         'role' => 'teacher',
         'assigned_grades' => $assignedGrades,
         'assigned_subjects' => $assignedSubjects,
+        'section' => !empty($assignedSections) ? implode(', ', $assignedSections) : null,
     ]);
 
     return redirect()->route('dashboard')->with('success', 'Teacher registered successfully!');

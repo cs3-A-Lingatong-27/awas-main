@@ -544,6 +544,39 @@ const subjectsByGrade = {
     ],
 };
 const subjectCatalog = @json($subjectCatalog ?? []);
+const regularSubjectsByGrade = {
+    10: [
+        'Biology 2',
+        'Chemistry 2',
+        'Physics 2',
+        'Mathematics 4',
+        'English 4',
+        'Filipino 4',
+        'Social Science 4',
+        'Physical Education 4',
+        'Health 4',
+        'Music 4',
+        'Values Education 4',
+        'STEM Research 1',
+        'Computer Science 4',
+    ],
+    11: [
+        'Mathematics 5',
+        'English 5',
+        'Filipino 5',
+        'Social Science 5',
+        'STEM Research 2',
+        'Computer Science 5',
+    ],
+    12: [
+        'Mathematics 6',
+        'English 6',
+        'Filipino 6',
+        'Social Science 6',
+        'STEM Research 3',
+        'Computer Science 5',
+    ],
+};
 
 const studentGroupSubjectCatalog = {
     10: {
@@ -656,7 +689,7 @@ function renderStudentSubjectGroupList(selectedGradeInt, selectedGroups) {
                 <div class="mt-1 grid gap-1">
                     ${gradeCatalog.regular.map((item) => `
                         <label class="inline-flex items-start gap-2">
-                            <input type="checkbox" name="selected_subjects[regular][]" value="${item.replace(/"/g, '&quot;')}" class="rounded border-gray-300" ${previous.regular.has(item) ? 'checked' : ''}>
+                            <input type="checkbox" name="selected_subjects[regular][]" value="${item.replace(/"/g, '&quot;')}" class="rounded border-gray-300" checked disabled>
                             <span>${item}</span>
                         </label>
                     `).join('')}
@@ -732,26 +765,28 @@ function updateEnrollmentSections() {
         groupScienceCore.disabled = true;
         groupElective.checked = false;
         groupElective.disabled = true;
-        groupHint.textContent = 'Grades 7-9 use Regular only.';
+        groupHint.textContent = 'Grades 7-9 use Regular only (auto-assigned).';
     } else if (selectedGradeInt === 10) {
-        groupRegular.disabled = false;
-        groupRegularHidden.disabled = true;
+        groupRegular.checked = true;
+        groupRegular.disabled = true;
+        groupRegularHidden.disabled = false;
         groupScienceCore.checked = false;
         groupScienceCore.disabled = true;
         groupElective.disabled = false;
-        if (!groupRegular.checked && !groupElective.checked) {
+        if (!groupElective.checked) {
             groupElective.checked = true;
         }
-        groupHint.textContent = 'Grade 10 can use Regular and/or Elective.';
+        groupHint.textContent = 'Grade 10 regular subjects are auto-assigned; electives optional.';
     } else if (selectedGradeInt === 11 || selectedGradeInt === 12) {
-        groupRegular.disabled = false;
-        groupRegularHidden.disabled = true;
+        groupRegular.checked = true;
+        groupRegular.disabled = true;
+        groupRegularHidden.disabled = false;
         groupScienceCore.disabled = false;
         groupElective.disabled = false;
         if (!groupRegular.checked && !groupScienceCore.checked && !groupElective.checked) {
             groupElective.checked = true;
         }
-        groupHint.textContent = 'Grades 11-12 can use Regular, Elective, and/or Science Core.';
+        groupHint.textContent = 'Grades 11-12 regular subjects are auto-assigned; science core/electives optional.';
     }
 
     const selectedGroups = [];
@@ -789,8 +824,8 @@ function updateEnrollmentSections() {
     }
 }
 function getTeacherTypeOptionsForGrade(grade) {
-    if (grade === 10) return ['elective'];
-    if (grade === 11 || grade === 12) return ['science_core', 'elective'];
+    if (grade === 10) return ['regular', 'elective'];
+    if (grade === 11 || grade === 12) return ['regular', 'science_core', 'elective'];
     return [];
 }
 
@@ -973,19 +1008,27 @@ async function fetchTeacherList() {
 }
 
 function getTeacherTypeLabel(type) {
+    if (type === 'regular') return 'Regular';
     if (type === 'science_core') return 'Science Core';
     if (type === 'elective') return 'Elective';
     return type;
 }
 
 function getTeacherSubjectsByGradeAndType(grade, type) {
-    return subjectCatalog
+    const normalizedType = type === 'regular' ? 'core' : type;
+    const results = subjectCatalog
         .filter((subject) =>
             Number(subject.grade_level_start) <= grade &&
             Number(subject.grade_level_end) >= grade &&
-            subject.type === type
+            subject.type === normalizedType
         )
         .map((subject) => subject.name);
+
+    if (results.length === 0 && normalizedType === 'core') {
+        return regularSubjectsByGrade[grade] ?? [];
+    }
+
+    return results;
 }
 
 function renderTeacherSubjectTypeOptions() {
@@ -1034,6 +1077,10 @@ function renderTeacherSubjectTypeOptions() {
             input.className = 'rounded border-gray-300';
             if (previousSelections[grade]?.has(type)) {
                 input.checked = true;
+            } else if (!previousSelections[grade] || previousSelections[grade]?.size === 0) {
+                if (type === 'regular') {
+                    input.checked = true;
+                }
             }
 
             const span = document.createElement('span');
@@ -1066,49 +1113,95 @@ function renderTeacherSubjectOptions() {
         return;
     }
 
-    const subjectPool = [...new Set(selectedGrades.flatMap((grade) => {
-        if (grade <= 9) {
-            return getSubjectsForGrade(grade);
-        }
-
-        const selectedTypes = Array.from(
-            teacherForm.querySelectorAll(`input[name="teacher_subject_groups[${grade}][]"]:checked`)
-        ).map((input) => input.value);
-
-        if (selectedTypes.length === 0) {
-            return [];
-        }
-
-        return [...new Set(selectedTypes.flatMap((type) => getTeacherSubjectsByGradeAndType(grade, type)))];
-    }))];
-
     subjectContainer.innerHTML = '';
+    let hasContent = false;
 
-    if (subjectPool.length === 0) {
-        subjectContainer.innerHTML = '<p class="col-span-2 text-sm text-gray-500">Select at least one assignment type for Grade 10-12 to show subjects.</p>';
-        return;
-    }
+    selectedGrades.forEach((grade) => {
+        const gradeSubjects = [];
 
-    subjectPool.forEach((subjectName) => {
-        const label = document.createElement('label');
-        label.className = 'inline-flex items-center gap-2 text-sm';
+        if (grade <= 9) {
+            const regularSubjects = getSubjectsForGrade(grade);
+            if (regularSubjects.length > 0) {
+                gradeSubjects.push({ label: 'Regular', items: regularSubjects });
+            }
+        } else {
+            const selectedTypes = Array.from(
+                teacherForm.querySelectorAll(`input[name="teacher_subject_groups[${grade}][]"]:checked`)
+            ).map((input) => input.value);
 
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.name = 'assigned_subjects[]';
-        input.value = subjectName;
-        input.className = 'rounded border-gray-300';
-        if (previousSelections.has(subjectName)) {
-            input.checked = true;
+            if (selectedTypes.includes('regular')) {
+                const regularSubjects = getTeacherSubjectsByGradeAndType(grade, 'regular');
+                if (regularSubjects.length > 0) {
+                    gradeSubjects.push({ label: 'Regular', items: regularSubjects });
+                }
+            }
+            if (selectedTypes.includes('science_core')) {
+                const scienceSubjects = getTeacherSubjectsByGradeAndType(grade, 'science_core');
+                if (scienceSubjects.length > 0) {
+                    gradeSubjects.push({ label: 'Science Core', items: scienceSubjects });
+                }
+            }
+            if (selectedTypes.includes('elective')) {
+                const electiveSubjects = getTeacherSubjectsByGradeAndType(grade, 'elective');
+                if (electiveSubjects.length > 0) {
+                    gradeSubjects.push({ label: 'Elective', items: electiveSubjects });
+                }
+            }
         }
 
-        const span = document.createElement('span');
-        span.textContent = subjectName;
+        if (gradeSubjects.length === 0) {
+            return;
+        }
 
-        label.appendChild(input);
-        label.appendChild(span);
-        subjectContainer.appendChild(label);
+        hasContent = true;
+
+        const gradeBlock = document.createElement('div');
+        gradeBlock.className = 'col-span-2 rounded border border-gray-200 bg-gray-50 p-3';
+
+        const title = document.createElement('div');
+        title.className = 'mb-2 text-sm font-semibold text-slate-700';
+        title.textContent = `Grade ${grade}`;
+        gradeBlock.appendChild(title);
+
+        gradeSubjects.forEach((group) => {
+            const groupTitle = document.createElement('div');
+            groupTitle.className = 'text-xs font-semibold text-blue-700';
+            groupTitle.textContent = group.label;
+            gradeBlock.appendChild(groupTitle);
+
+            const list = document.createElement('div');
+            list.className = 'mt-1 grid grid-cols-2 gap-2';
+
+            group.items.forEach((subjectName) => {
+                const label = document.createElement('label');
+                label.className = 'inline-flex items-center gap-2 text-sm';
+
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.name = 'assigned_subjects[]';
+                input.value = subjectName;
+                input.className = 'rounded border-gray-300';
+                if (previousSelections.has(subjectName)) {
+                    input.checked = true;
+                }
+
+                const span = document.createElement('span');
+                span.textContent = subjectName;
+
+                label.appendChild(input);
+                label.appendChild(span);
+                list.appendChild(label);
+            });
+
+            gradeBlock.appendChild(list);
+        });
+
+        subjectContainer.appendChild(gradeBlock);
     });
+
+    if (!hasContent) {
+        subjectContainer.innerHTML = '<p class="col-span-2 text-sm text-gray-500">Select at least one assignment type for Grade 10-12 to show subjects.</p>';
+    }
 }
 
 function renderTeacherSectionOptions() {
@@ -1128,34 +1221,56 @@ function renderTeacherSectionOptions() {
         return;
     }
 
-    const sectionPool = [...new Set(selectedGrades.flatMap((grade) => sectionsByGrade[grade] ?? []))];
     sectionContainer.innerHTML = '';
+    let hasSections = false;
 
-    if (sectionPool.length === 0) {
-        sectionContainer.innerHTML = '<p class="col-span-2 text-sm text-gray-500">No sections configured for the selected grade level(s).</p>';
-        return;
-    }
-
-    sectionPool.forEach((sectionName) => {
-        const label = document.createElement('label');
-        label.className = 'inline-flex items-center gap-2 text-sm';
-
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.name = 'assigned_sections[]';
-        input.value = sectionName;
-        input.className = 'rounded border-gray-300';
-        if (previousSelections.has(sectionName)) {
-            input.checked = true;
+    selectedGrades.forEach((grade) => {
+        const gradeSections = sectionsByGrade[grade] ?? [];
+        if (gradeSections.length === 0) {
+            return;
         }
 
-        const span = document.createElement('span');
-        span.textContent = sectionName;
+        hasSections = true;
 
-        label.appendChild(input);
-        label.appendChild(span);
-        sectionContainer.appendChild(label);
+        const gradeBlock = document.createElement('div');
+        gradeBlock.className = 'col-span-2 rounded border border-gray-200 bg-gray-50 p-3';
+
+        const title = document.createElement('div');
+        title.className = 'mb-2 text-sm font-semibold text-slate-700';
+        title.textContent = `Grade ${grade}`;
+        gradeBlock.appendChild(title);
+
+        const list = document.createElement('div');
+        list.className = 'grid grid-cols-2 gap-2';
+
+        gradeSections.forEach((sectionName) => {
+            const label = document.createElement('label');
+            label.className = 'inline-flex items-center gap-2 text-sm';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.name = 'assigned_sections[]';
+            input.value = sectionName;
+            input.className = 'rounded border-gray-300';
+            if (previousSelections.has(sectionName)) {
+                input.checked = true;
+            }
+
+            const span = document.createElement('span');
+            span.textContent = sectionName;
+
+            label.appendChild(input);
+            label.appendChild(span);
+            list.appendChild(label);
+        });
+
+        gradeBlock.appendChild(list);
+        sectionContainer.appendChild(gradeBlock);
     });
+
+    if (!hasSections) {
+        sectionContainer.innerHTML = '<p class="col-span-2 text-sm text-gray-500">No sections configured for the selected grade level(s).</p>';
+    }
 }
 
 const enrollmentGradeDropdown = document.querySelector('select[name="grade_level"]');

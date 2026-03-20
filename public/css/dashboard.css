@@ -290,6 +290,8 @@ select {
     transition: 0.3s ease-in-out;
     z-index: 1000;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
 }
 
 .side-panel.open {
@@ -316,6 +318,13 @@ select {
     align-items: center;
     border-bottom: 2px solid #eee;
     padding-bottom: 10px;
+}
+
+.side-panel .panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 16px;
 }
 
 .close-btn {
