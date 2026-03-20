@@ -63,6 +63,100 @@ public function index()
                 'AdTech 1',
                 'Computer Science 1',
             ],
+            8 => [
+                'Biology 1',
+                'Chemistry 1',
+                'Physics 1',
+                'Mathematics 2',
+                'Mathematics 3',
+                'Earth Science',
+                'English 2',
+                'Filipino 2',
+                'Social Science 2',
+                'Physical Education 2',
+                'Health 2',
+                'Music 2',
+                'Values Education 2',
+                'AdTech 2',
+                'Computer Science 2',
+            ],
+            9 => [
+                'Biology 1',
+                'Chemistry 1',
+                'Physics 1',
+                'Mathematics 3',
+                'English 3',
+                'Filipino 3',
+                'Social Science 3',
+                'Physical Education 3',
+                'Health 3',
+                'Music 3',
+                'Values Education 3',
+                'Statistics 1',
+                'Computer Science 3',
+            ],
+            10 => [
+                'Biology 2',
+                'Chemistry 2',
+                'Physics 2',
+                'Mathematics 4',
+                'English 4',
+                'Filipino 4',
+                'Social Science 4',
+                'Physical Education 4',
+                'Health 4',
+                'Music 4',
+                'Values Education 4',
+                'STEM Research 1',
+                'Computer Science 4',
+                'Philippine Biodiversity (AYP)',
+                'Microbiology and Basic Molecular Techniques',
+                'Data Science',
+                'Field Sampling Techniques',
+                'Intellectual Property Rights',
+            ],
+            11 => [
+                'Biology 3 Class 1',
+                'Biology 3 Class 2',
+                'Chemistry 3 Class 1',
+                'Chemistry 3 Class 2',
+                'Physics 3 Class 1',
+                'Physics 3 Class 2',
+                'Mathematics 5',
+                'English 5',
+                'Filipino 5',
+                'Social Science 5',
+                'STEM Research 2',
+                'Computer Science 5',
+                'Engineering',
+                'Design and Make Technology',
+                'Agriculture',
+                'Biology 3 Elective',
+                'Chemistry 3 Elective Class 1',
+                'Chemistry 3 Elective Class 2',
+                'Physics 3 Elective',
+            ],
+            12 => [
+                'Biology 4 Class 1',
+                'Biology 4 Class 2',
+                'Chemistry 4 Class 1',
+                'Chemistry 4 Class 2',
+                'Physics 4 Class 1',
+                'Physics 4 Class 2',
+                'Mathematics 6',
+                'English 6',
+                'Filipino 6',
+                'Social Science 6',
+                'STEM Research 3',
+                'Computer Science 5',
+                'Engineering',
+                'Design and Make Technology',
+                'Agriculture',
+                'Biology 4 Elective',
+                'Chemistry 4 Elective Class 1',
+                'Chemistry 4 Elective Class 2',
+                'Physics 4 Elective',
+            ],
         ];
         // 1. Validate input
         $request->validate([
@@ -74,16 +168,30 @@ public function index()
             'subject' => 'required|string',
             'section' => 'nullable|string|max:100',
         ]);
-    
 
-if (!in_array((int)$request->grade_level, $allowedGrades) || !in_array($request->subject, $allowedSubjects)) {
-        return back()->with('error', "Unauthorized: You are not assigned to this Grade or Subject.");
-    }
+        $date = $request->due_date;
+        $type = $request->type === 'Alternative Assessment' ? 'Alternative Assessment (AA)' : $request->type;
+        $grade = (int) $request->grade_level;
+        $section = $request->filled('section') ? trim((string) $request->section) : null;
+        $subjectName = $request->subject;
 
-        $requestedGrade = (int) $request->grade_level;
-        if (isset($gradeSubjectMap[$requestedGrade]) && !in_array($request->subject, $gradeSubjectMap[$requestedGrade], true)) {
-            return back()->with('error', "Invalid subject for Grade {$requestedGrade}.");
+        $rescheduleId = $request->input('reschedule_assessment_id');
+        $rescheduleAssessment = null;
+        if ($rescheduleId) {
+            $rescheduleAssessment = Assessment::where('id', $rescheduleId)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+            $type = $rescheduleAssessment->type;
+            $grade = (int) $rescheduleAssessment->grade_level;
+            $section = $rescheduleAssessment->section;
+            $subjectName = $rescheduleAssessment->subject ? $rescheduleAssessment->subject->name : $subjectName;
         }
+
+        if (!in_array($grade, $allowedGrades) || !in_array($subjectName, $allowedSubjects)) {
+            return back()->with('error', "Unauthorized: You are not assigned to this Grade or Subject.");
+        }
+
+        $requestedGrade = $grade;
 
         $gradeSectionMap = [
             7 => ['Opal', 'Turquoise', 'Aquamarine', 'Sapphire'],
@@ -94,8 +202,7 @@ if (!in_array((int)$request->grade_level, $allowedGrades) || !in_array($request-
             12 => ['Orosa', 'Del Mundo', 'Zara'],
         ];
 
-        $section = $request->filled('section') ? trim((string) $request->section) : null;
-        $subjectMeta = Subject::where('name', $request->subject)
+        $subjectMeta = Subject::where('name', $subjectName)
             ->where('grade_level_start', '<=', $requestedGrade)
             ->where('grade_level_end', '>=', $requestedGrade)
             ->first();
@@ -114,10 +221,6 @@ if (!in_array((int)$request->grade_level, $allowedGrades) || !in_array($request-
                 return back()->with('error', "Invalid section for Grade {$requestedGrade}.");
             }
         }
-
-        $date = $request->due_date;
-        $type = $request->type === 'Alternative Assessment' ? 'Alternative Assessment (AA)' : $request->type;
-        $grade = $request->grade_level;
 
         // 3. THE AWAS ALGORITHM (Conflict Detection)
         if ($type === 'Formative Assessment') {
@@ -147,6 +250,16 @@ if (!in_array((int)$request->grade_level, $allowedGrades) || !in_array($request-
             return back()->with('error', "Only administrators can schedule Long Tests.");
         }
 
+        if ($rescheduleAssessment) {
+            $rescheduleAssessment->scheduled_at = $date . ' ' . $request->due_time;
+            $rescheduleAssessment->confirmation_status = 'scheduled';
+            $rescheduleAssessment->confirmation_requested_at = null;
+            $rescheduleAssessment->conducted_at = null;
+            $rescheduleAssessment->save();
+
+            return back()->with('success', 'Assessment rescheduled successfully!');
+        }
+
         // 4. Save
         Assessment::create([
             'title'        => $request->title,
@@ -155,8 +268,9 @@ if (!in_array((int)$request->grade_level, $allowedGrades) || !in_array($request-
             'grade_level'  => $grade,
             'section'      => $section,
             'subject_id'   => null, 
-            'description'  => "Subject: " . $request->subject . ($section ? " | Section: {$section}" : ''),
+            'description'  => "Subject: " . $subjectName . ($section ? " | Section: {$section}" : ''),
             'user_id'      => $user->id, 
+            'confirmation_status' => 'scheduled',
         ]);
 
         return back()->with('success', 'Assessment scheduled successfully!');

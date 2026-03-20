@@ -21,7 +21,9 @@ public function up(): void {
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            //
+            if (Schema::hasColumn('users', 'subject')) {
+                $table->dropColumn('subject');
+            }
         });
     }
 };

@@ -85,6 +85,100 @@ public function storeTeacher(Request $request)
             'AdTech 1',
             'Computer Science 1',
         ],
+        8 => [
+            'Biology 1',
+            'Chemistry 1',
+            'Physics 1',
+            'Mathematics 2',
+            'Mathematics 3',
+            'Earth Science',
+            'English 2',
+            'Filipino 2',
+            'Social Science 2',
+            'Physical Education 2',
+            'Health 2',
+            'Music 2',
+            'Values Education 2',
+            'AdTech 2',
+            'Computer Science 2',
+        ],
+        9 => [
+            'Biology 1',
+            'Chemistry 1',
+            'Physics 1',
+            'Mathematics 3',
+            'English 3',
+            'Filipino 3',
+            'Social Science 3',
+            'Physical Education 3',
+            'Health 3',
+            'Music 3',
+            'Values Education 3',
+            'Statistics 1',
+            'Computer Science 3',
+        ],
+        10 => [
+            'Biology 2',
+            'Chemistry 2',
+            'Physics 2',
+            'Mathematics 4',
+            'English 4',
+            'Filipino 4',
+            'Social Science 4',
+            'Physical Education 4',
+            'Health 4',
+            'Music 4',
+            'Values Education 4',
+            'STEM Research 1',
+            'Computer Science 4',
+            'Philippine Biodiversity (AYP)',
+            'Microbiology and Basic Molecular Techniques',
+            'Data Science',
+            'Field Sampling Techniques',
+            'Intellectual Property Rights',
+        ],
+        11 => [
+            'Biology 3 Class 1',
+            'Biology 3 Class 2',
+            'Chemistry 3 Class 1',
+            'Chemistry 3 Class 2',
+            'Physics 3 Class 1',
+            'Physics 3 Class 2',
+            'Mathematics 5',
+            'English 5',
+            'Filipino 5',
+            'Social Science 5',
+            'STEM Research 2',
+            'Computer Science 5',
+            'Engineering',
+            'Design and Make Technology',
+            'Agriculture',
+            'Biology 3 Elective',
+            'Chemistry 3 Elective Class 1',
+            'Chemistry 3 Elective Class 2',
+            'Physics 3 Elective',
+        ],
+        12 => [
+            'Biology 4 Class 1',
+            'Biology 4 Class 2',
+            'Chemistry 4 Class 1',
+            'Chemistry 4 Class 2',
+            'Physics 4 Class 1',
+            'Physics 4 Class 2',
+            'Mathematics 6',
+            'English 6',
+            'Filipino 6',
+            'Social Science 6',
+            'STEM Research 3',
+            'Computer Science 5',
+            'Engineering',
+            'Design and Make Technology',
+            'Agriculture',
+            'Biology 4 Elective',
+            'Chemistry 4 Elective Class 1',
+            'Chemistry 4 Elective Class 2',
+            'Physics 4 Elective',
+        ],
     ];
 
     $validated = $request->validate([
@@ -100,14 +194,7 @@ public function storeTeacher(Request $request)
     $assignedSubjects = array_values(array_unique($validated['assigned_subjects']));
     $assignedGrades = array_map('intval', array_values(array_unique($validated['assigned_grades'])));
 
-    if (in_array(7, $assignedGrades, true)) {
-        $invalidGrade7Subjects = array_diff($assignedSubjects, $gradeSubjectMap[7]);
-        if (!empty($invalidGrade7Subjects)) {
-            return back()->withErrors([
-                'assigned_subjects' => 'For Grade 7, use only the official Grade 7 subject list.',
-            ])->withInput();
-        }
-    }
+    // Temporarily allow Grade 7 subject selection to avoid blocking enrollment.
 
     User::create([
         'name' => $validated['name'],

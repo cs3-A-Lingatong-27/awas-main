@@ -17,7 +17,10 @@ class Assessment extends Model
         'type', 
         'title', 
         'description', 
-        'scheduled_at', 
+        'scheduled_at',
+        'confirmation_status',
+        'confirmation_requested_at',
+        'conducted_at',
     ];
 
     /**
@@ -42,6 +45,12 @@ class Assessment extends Model
     {
         return $this->belongsTo(Room::class);
     }
+
+    protected $casts = [
+        'scheduled_at' => 'datetime',
+        'confirmation_requested_at' => 'datetime',
+        'conducted_at' => 'datetime',
+    ];
 
     // Link to the Teacher/User who created the assessment
     public function teacher(): BelongsTo

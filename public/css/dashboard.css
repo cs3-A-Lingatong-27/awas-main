@@ -116,6 +116,45 @@ select {
   color: #475569;
 }
 
+.admin-assessments-modal .admin-assessments-filters {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.admin-assessments-modal .admin-assessments-filters .grid {
+  gap: 8px;
+}
+
+.admin-assessments-modal .admin-assessments-list .rounded-xl {
+  max-height: calc(100vh - 18rem);
+}
+
+.admin-assessments-modal .admin-assessments-filters .grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.admin-assessments-modal .admin-assessments-filters label {
+  font-size: 11px;
+}
+
+.admin-assessments-modal .admin-assessments-filters .admin-filter-select {
+  height: 32px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+@media (max-width: 900px) {
+  .admin-assessments-modal .admin-assessments-filters .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-assessments-modal .admin-assessments-filters .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .legend-item {
   display: inline-flex;
   align-items: center;
@@ -407,6 +446,17 @@ select {
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 8px;
+}
+
+select {
+    padding-right: 28px;
+    background-position: right 10px center;
+    background-repeat: no-repeat;
+}
+
+.calendar-nav select.calendar-select {
+    padding-right: 32px;
+    min-width: 96px;
 }
 
 .form-row {

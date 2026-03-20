@@ -23,8 +23,13 @@ public function up(): void
      */
     public function down(): void
     {
-        Schema::table('json', function (Blueprint $table) {
-            //
+        Schema::table('users', function (Blueprint $table) {
+            if (Schema::hasColumn('users', 'assigned_grades')) {
+                $table->dropColumn('assigned_grades');
+            }
+            if (Schema::hasColumn('users', 'assigned_subjects')) {
+                $table->dropColumn('assigned_subjects');
+            }
         });
     }
 };

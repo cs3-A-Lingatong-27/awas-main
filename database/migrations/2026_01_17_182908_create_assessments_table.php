@@ -22,7 +22,7 @@ public function up(): void
         // 2. Added for AWAS logic
         $table->integer('grade_level'); 
         $table->string('section')->nullable(); 
-        
+        $table->dateTime('scheduled_at'); 
         $table->string('type'); 
         $table->string('title');
         $table->text('description')->nullable();

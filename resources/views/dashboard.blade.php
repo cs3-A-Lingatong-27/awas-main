@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Dashboard</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800&display=swap" rel="stylesheet" />
@@ -25,17 +26,168 @@
     
   @if(session('success'))
     <div id="successToast" class="toast-notification">
-        <span class="icon">✅</span> {{ session('success') }}
+        <span class="icon">OK</span> {{ session('success') }}
     </div>
-
     <script>
         setTimeout(() => {
             const toast = document.getElementById('successToast');
+            if (!toast) return;
             toast.style.opacity = '0';
             setTimeout(() => toast.remove(), 500);
         }, 3000);
     </script>
 @endif
+
+@if(auth()->user()->role === 'admin')
+<div id="adminAssessmentsModal" class="admin-assessments-modal fixed inset-0 z-[9999] hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4" style="z-index: 2147483647;">
+    <div class="flex w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" style="height: calc(100vh - 2rem); max-height: calc(100vh - 2rem);">
+        <div class="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900">All Assessments</h3>
+                <p class="text-sm text-slate-500">All subjects, grades, sections, and subject groups.</p>
+            </div>
+            <button type="button" id="closeAdminAssessmentsBtn" class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100">Close</button>
+        </div>
+        <div class="admin-assessments-filters px-6 py-2">
+            <div class="grid gap-3 md:grid-cols-5">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Grade</label>
+                    <select id="adminAssessmentGradeFilter" class="w-full border p-2 rounded text-sm admin-filter-select">
+                        <option value="">All Grades</option>
+                        @foreach([7,8,9,10,11,12] as $grade)
+                            <option value="{{ $grade }}">Grade {{ $grade }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Section</label>
+                    <select id="adminAssessmentSectionFilter" class="w-full border p-2 rounded text-sm admin-filter-select">
+                        <option value="">All Sections</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Subject</label>
+                    <select id="adminAssessmentSubjectFilter" class="w-full border p-2 rounded text-sm admin-filter-select">
+                        <option value="">All Subjects</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Subject Type</label>
+                    <div class="flex flex-wrap gap-3 text-xs">
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" id="adminTypeScienceCore" value="science_core" class="rounded border-gray-300">
+                            <span>Science Core</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" id="adminTypeElective" value="elective" class="rounded border-gray-300">
+                            <span>Elective</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-2 text-right">
+                <button id="adminAssessmentsApplyFilters" type="button" class="rounded bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700">Apply Filters</button>
+            </div>
+        </div>
+        <div class="admin-assessments-list flex min-h-0 flex-1 flex-col px-6 pb-6" style="min-height: 0;">
+            <div id="adminAssessmentsStatus" class="text-sm text-slate-500">Loading...</div>
+            <div class="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-gray-200" style="min-height: 0; max-height: calc(100vh - 22rem);">
+                <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-sm">
+                        <tr>
+                            <th class="px-4 py-3">Title</th>
+                            <th class="px-4 py-3">Type</th>
+                            <th class="px-4 py-3">Grade</th>
+                            <th class="px-4 py-3">Section</th>
+                            <th class="px-4 py-3">Subject</th>
+                            <th class="px-4 py-3">Subject Type</th>
+                            <th class="px-4 py-3">Scheduled</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminAssessmentsBody" class="divide-y divide-gray-100 bg-white">
+                        <tr>
+                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+@if(auth()->user()->role === 'teacher')
+<div id="teacherAssessmentsModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4" style="z-index: 2147483647;">
+    <div class="flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" style="height: calc(100vh - 2rem); max-height: calc(100vh - 2rem);">
+        <div class="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900">My Assessments</h3>
+                <p class="text-sm text-slate-500">Only assessments created by you.</p>
+            </div>
+            <button type="button" id="closeTeacherAssessmentsBtn" class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100">Close</button>
+        </div>
+        <div class="flex min-h-0 flex-1 flex-col px-6 py-4" style="min-height: 0;">
+            <div id="teacherAssessmentsStatus" class="text-sm text-slate-500">Loading...</div>
+            <div class="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-gray-200" style="min-height: 0; max-height: calc(100vh - 20rem);">
+                <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-sm">
+                        <tr>
+                            <th class="px-4 py-3">Title</th>
+                            <th class="px-4 py-3">Type</th>
+                            <th class="px-4 py-3">Grade</th>
+                            <th class="px-4 py-3">Subject</th>
+                            <th class="px-4 py-3">Scheduled</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teacherAssessmentsBody" class="divide-y divide-gray-100 bg-white">
+                        <tr>
+                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+@if(auth()->user()->role === 'teacher')
+<div id="teacherConfirmationsModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4" style="z-index: 2147483647;">
+    <div class="flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" style="height: calc(100vh - 2rem); max-height: calc(100vh - 2rem);">
+        <div class="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900">Assessment Confirmations</h3>
+                <p class="text-sm text-slate-500">Confirm whether assessments were conducted.</p>
+            </div>
+            <button type="button" id="closeTeacherConfirmationsBtn" class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100">Close</button>
+        </div>
+        <div class="flex min-h-0 flex-1 flex-col px-6 py-4" style="min-height: 0;">
+            <div id="teacherConfirmationsStatus" class="text-sm text-slate-500">Loading...</div>
+            <div class="mt-4 min-h-0 flex-1 overflow-y-auto rounded-xl border border-gray-200" style="min-height: 0; max-height: calc(100vh - 20rem);">
+                <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-sm">
+                        <tr>
+                            <th class="px-4 py-3">Title</th>
+                            <th class="px-4 py-3">Type</th>
+                            <th class="px-4 py-3">Grade</th>
+                            <th class="px-4 py-3">Subject</th>
+                            <th class="px-4 py-3">Scheduled</th>
+                            <th class="px-4 py-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teacherConfirmationsBody" class="divide-y divide-gray-100 bg-white">
+                        <tr>
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+
     <div class="app auth-card overflow-hidden">
 <header class="topbar flex items-center justify-between px-8 py-4 bg-slate-900 text-white shadow-lg">
     <div class="logo flex items-center gap-3">
@@ -90,14 +242,14 @@
                 
                 <div class="calendar-nav" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
                     <form action="{{ route('dashboard') }}" method="GET" class="flex gap-2">
-                        <select name="month" onchange="this.form.submit()" class="border p-1 rounded">
+                        <select name="month" onchange="this.form.submit()" class="border p-1 rounded calendar-select">
                             @foreach(range(1, 12) as $m)
                                 <option value="{{ $m }}" {{ $date->month == $m ? 'selected' : '' }}>
                                     {{ date('F', mktime(0, 0, 0, $m, 1)) }}
                                 </option>
                             @endforeach
                         </select>
-                        <select name="year" onchange="this.form.submit()" class="border p-1 rounded">
+                        <select name="year" onchange="this.form.submit()" class="border p-1 rounded calendar-select">
                             @for($y = 2024; $y <= 2030; $y++)
                                 <option value="{{ $y }}" {{ $date->year == $y ? 'selected' : '' }}>{{ $y }}</option>
                             @endfor
@@ -118,6 +270,12 @@
                     <div class="mb-3 relative inline-block z-[120]">
                         <button id="openCalendarFilterPanelBtn" type="button" class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             Filters
+                        </button>
+                        <button id="openTeacherAssessmentsBtn" type="button" class="ml-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100">
+                            My Assessments
+                        </button>
+                        <button id="openTeacherConfirmationsBtn" type="button" class="ml-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100">
+                            Notifications
                         </button>
                         <div id="teacherCalendarFilterPanel" class="hidden fixed z-[220] w-72 rounded border border-gray-200 bg-white p-3 shadow-2xl">
                             <div class="mb-2">
@@ -152,6 +310,14 @@
                                 <button id="confirmCalendarFilterBtn" type="button" class="rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white">Confirm</button>
                             </div>
                         </div>
+                    </div>
+                @endif
+
+                @if(auth()->user()->role === 'admin')
+                    <div class="mb-3 relative inline-block z-[120]">
+                        <button id="openAdminAssessmentsBtn" type="button" class="rounded border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100">
+                            All Assessments
+                        </button>
                     </div>
                 @endif
 
@@ -344,6 +510,8 @@ let tempDate = '';
 let tempDateString = '';
 let hoverHideTimer = null;
 const hoverCache = new Map();
+let pendingReschedule = null;
+let confirmationAutoOpened = false;
 const sectionsByGrade = {
     "7": ["Opal", "Turquoise", "Aquamarine", "Sapphire"],
     "8": ["Anthurium", "Carnation", "Daffodil", "Sunflower"],
@@ -366,19 +534,104 @@ const subjectsByGrade = {
         "AdTech 1",
         "Computer Science 1"
     ],
+    8: [
+        "Biology 1",
+        "Chemistry 1",
+        "Physics 1",
+        "Mathematics 2",
+        "Mathematics 3",
+        "Earth Science",
+        "English 2",
+        "Filipino 2",
+        "Social Science 2",
+        "Physical Education 2",
+        "Health 2",
+        "Music 2",
+        "Values Education 2",
+        "AdTech 2",
+        "Computer Science 2"
+    ],
+    9: [
+        "Biology 1",
+        "Chemistry 1",
+        "Physics 1",
+        "Mathematics 3",
+        "English 3",
+        "Filipino 3",
+        "Social Science 3",
+        "Physical Education 3",
+        "Health 3",
+        "Music 3",
+        "Values Education 3",
+        "Statistics 1",
+        "Computer Science 3"
+    ],
+    10: [
+        "Biology 2",
+        "Chemistry 2",
+        "Physics 2",
+        "Mathematics 4",
+        "English 4",
+        "Filipino 4",
+        "Social Science 4",
+        "Physical Education 4",
+        "Health 4",
+        "Music 4",
+        "Values Education 4",
+        "STEM Research 1",
+        "Computer Science 4",
+        "Philippine Biodiversity (AYP)",
+        "Microbiology and Basic Molecular Techniques",
+        "Data Science",
+        "Field Sampling Techniques",
+        "Intellectual Property Rights"
+    ],
+    11: [
+        "Biology 3 Class 1",
+        "Biology 3 Class 2",
+        "Chemistry 3 Class 1",
+        "Chemistry 3 Class 2",
+        "Physics 3 Class 1",
+        "Physics 3 Class 2",
+        "Mathematics 5",
+        "English 5",
+        "Filipino 5",
+        "Social Science 5",
+        "STEM Research 2",
+        "Computer Science 5",
+        "Engineering",
+        "Design and Make Technology",
+        "Agriculture",
+        "Biology 3 Elective",
+        "Chemistry 3 Elective Class 1",
+        "Chemistry 3 Elective Class 2",
+        "Physics 3 Elective"
+    ],
+    12: [
+        "Biology 4 Class 1",
+        "Biology 4 Class 2",
+        "Chemistry 4 Class 1",
+        "Chemistry 4 Class 2",
+        "Physics 4 Class 1",
+        "Physics 4 Class 2",
+        "Mathematics 6",
+        "English 6",
+        "Filipino 6",
+        "Social Science 6",
+        "STEM Research 3",
+        "Computer Science 5",
+        "Engineering",
+        "Design and Make Technology",
+        "Agriculture",
+        "Biology 4 Elective",
+        "Chemistry 4 Elective Class 1",
+        "Chemistry 4 Elective Class 2",
+        "Physics 4 Elective"
+    ],
 };
-const fallbackSubjects = [
-    "Computer Science",
-    "Mathematics",
-    "Physics",
-    "Biology",
-    "Chemistry",
-    "English",
-    "Research"
-];
 
 function getSubjectsForGrade(grade) {
-    return subjectsByGrade[grade] ?? fallbackSubjects;
+    return subjectsByGrade[grade] ?? [];
 }
 
 function getTeacherTypeOptionsForGrade(grade) {
@@ -482,11 +735,18 @@ function openPanel(day, dateString) {
     document.getElementById('choiceDateTitle').innerText = dateString;
     document.getElementById('choiceModal').classList.remove('hidden');
     document.getElementById('choiceModal').classList.add('flex');
+
+    updateScheduleAvailability(tempDate);
 }
 async function handleChoice(action) {
     closeChoiceModal();
     
     if (action === 'schedule' && userRole === 'teacher') {
+        const allowed = await isScheduleAllowed(tempDate);
+        if (!allowed) {
+            showRoleFlash('Scheduling is disabled for this date.');
+            return;
+        }
         document.getElementById('panelDateTitle').innerText = "Schedule for " + tempDateString;
         document.getElementById('hiddenDate').value = tempDate;
         document.getElementById('assessmentPanel').classList.add('open');
@@ -494,6 +754,11 @@ async function handleChoice(action) {
         updateAssessmentSubjectOptions();
         updateAssessmentSectionOptions();
         syncAssessmentSectionState();
+        if (pendingReschedule) {
+            applyRescheduleFields();
+        } else {
+            clearRescheduleFields();
+        }
         checkConflict();
     } else {
         // --- THIS IS THE PART TO FIX ---
@@ -524,6 +789,7 @@ async function handleChoice(action) {
             <span class="text-[10px] uppercase tracking-wider font-bold text-blue-600">${a.subject}</span>
             <div class="font-bold text-gray-800">${a.title}</div>
             <div class="text-xs text-gray-500">${a.description || ''}</div>
+            <div class="text-xs text-gray-400 mt-1">${a.teacher ? `By ${a.teacher}` : ''}</div>
         </div>
     </div>
     <div class="text-xs text-gray-400 mt-2 font-mono">🕒 Deadline: ${a.due_time}</div>
@@ -555,9 +821,31 @@ const closeCalendarFilterPanelBtn = document.getElementById('closeCalendarFilter
 const confirmCalendarFilterBtn = document.getElementById('confirmCalendarFilterBtn');
 const teacherCalendarFilterPanel = document.getElementById('teacherCalendarFilterPanel');
 const teacherCalendarGradeFilter = document.getElementById('teacherCalendarGradeFilter');
-const teacherCalendarSectionFilter = document.getElementById('teacherCalendarSectionFilter');
+    const teacherCalendarSectionFilter = document.getElementById('teacherCalendarSectionFilter');
 const teacherCalendarSubjectFilter = document.getElementById('teacherCalendarSubjectFilter');
-let appliedTeacherCalendarFilters = { grade_level: '', section: '', subject: '' };
+    let appliedTeacherCalendarFilters = { grade_level: '', section: '', subject: '' };
+
+    const adminAssessmentsModal = document.getElementById('adminAssessmentsModal');
+    const openAdminAssessmentsBtn = document.getElementById('openAdminAssessmentsBtn');
+    const closeAdminAssessmentsBtn = document.getElementById('closeAdminAssessmentsBtn');
+    const adminAssessmentsBody = document.getElementById('adminAssessmentsBody');
+    const adminAssessmentsStatus = document.getElementById('adminAssessmentsStatus');
+    const adminAssessmentGradeFilter = document.getElementById('adminAssessmentGradeFilter');
+    const adminAssessmentSectionFilter = document.getElementById('adminAssessmentSectionFilter');
+    const adminAssessmentSubjectFilter = document.getElementById('adminAssessmentSubjectFilter');
+    const adminTypeScienceCore = document.getElementById('adminTypeScienceCore');
+    const adminTypeElective = document.getElementById('adminTypeElective');
+    const adminAssessmentsApplyFilters = document.getElementById('adminAssessmentsApplyFilters');
+    const teacherConfirmationsModal = document.getElementById('teacherConfirmationsModal');
+    const openTeacherConfirmationsBtn = document.getElementById('openTeacherConfirmationsBtn');
+    const closeTeacherConfirmationsBtn = document.getElementById('closeTeacherConfirmationsBtn');
+    const teacherConfirmationsBody = document.getElementById('teacherConfirmationsBody');
+    const teacherConfirmationsStatus = document.getElementById('teacherConfirmationsStatus');
+
+function getCsrfToken() {
+    const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+    return tokenMeta ? tokenMeta.getAttribute('content') : '';
+}
 
 function getIsoDateFromDay(day) {
     const year = {{ $date->year }};
@@ -566,12 +854,407 @@ function getIsoDateFromDay(day) {
     return `${year}-${month}-${dayStr}`;
 }
 
+function isPastDate(isoDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(`${isoDate}T00:00:00`);
+    return target < today;
+}
+
+async function isDayFullForTeacher(isoDate) {
+    const grades = Array.isArray(assignedGrades) && assignedGrades.length > 0 ? assignedGrades : [];
+    if (grades.length === 0) return false;
+
+    const checks = await Promise.all(
+        grades.map(async (grade) => {
+            try {
+                const response = await fetch(`/api/check-conflict?date=${isoDate}&grade_level=${grade}`);
+                if (!response.ok) return false;
+                const data = await response.json();
+                return data.status === 'CRITICAL';
+            } catch {
+                return false;
+            }
+        })
+    );
+
+    return checks.every((isFull) => isFull === true);
+}
+
+async function isScheduleAllowed(isoDate) {
+    if (userRole !== 'teacher') return false;
+    if (isPastDate(isoDate)) return false;
+
+    if (pendingReschedule) {
+        try {
+            const response = await fetch(`/api/check-conflict?date=${isoDate}&grade_level=${pendingReschedule.grade_level}&type=${encodeURIComponent(pendingReschedule.type)}`);
+            if (!response.ok) return false;
+            const data = await response.json();
+            return data.status !== 'CRITICAL';
+        } catch {
+            return false;
+        }
+    }
+
+    const full = await isDayFullForTeacher(isoDate);
+    return !full;
+}
+
+async function updateScheduleAvailability(isoDate) {
+    if (!hoverScheduleBtn && !document.getElementById('scheduleBtn')) return;
+
+    const scheduleBtn = document.getElementById('scheduleBtn');
+    const allowed = await isScheduleAllowed(isoDate);
+    const disable = !allowed;
+    const reason = isPastDate(isoDate)
+        ? 'Scheduling disabled for past dates.'
+        : 'Scheduling disabled: day is full for this assessment.';
+
+    [hoverScheduleBtn, scheduleBtn].forEach((btn) => {
+        if (!btn) return;
+        btn.disabled = disable;
+        btn.classList.toggle('opacity-50', disable);
+        btn.classList.toggle('cursor-not-allowed', disable);
+        btn.title = disable ? reason : '';
+    });
+}
+
+function applyRescheduleFields() {
+    if (!pendingReschedule) return;
+
+    const gradeSelect = document.getElementById('gradeSelect');
+    const subjectSelect = document.getElementById('subjectSelect');
+    const sectionSelect = document.getElementById('sectionSelect');
+    const typeSelect = document.getElementById('assessmentTypeSelect');
+    const titleInput = document.querySelector('#assessmentPanel input[name="title"]');
+
+    const rescheduleId = document.getElementById('rescheduleAssessmentId');
+    const rescheduleGradeHidden = document.getElementById('rescheduleGradeHidden');
+    const rescheduleSubjectHidden = document.getElementById('rescheduleSubjectHidden');
+    const rescheduleTypeHidden = document.getElementById('rescheduleTypeHidden');
+    const rescheduleSectionHidden = document.getElementById('rescheduleSectionHidden');
+
+    if (rescheduleId) {
+        rescheduleId.disabled = false;
+        rescheduleId.value = pendingReschedule.id;
+    }
+    if (rescheduleGradeHidden) {
+        rescheduleGradeHidden.disabled = false;
+        rescheduleGradeHidden.value = pendingReschedule.grade_level;
+    }
+    if (rescheduleSubjectHidden) {
+        rescheduleSubjectHidden.disabled = false;
+        rescheduleSubjectHidden.value = pendingReschedule.subject;
+    }
+    if (rescheduleTypeHidden) {
+        rescheduleTypeHidden.disabled = false;
+        rescheduleTypeHidden.value = pendingReschedule.type;
+    }
+    if (rescheduleSectionHidden) {
+        rescheduleSectionHidden.disabled = false;
+        rescheduleSectionHidden.value = pendingReschedule.section ?? '';
+    }
+
+    if (titleInput) {
+        titleInput.value = pendingReschedule.title;
+        titleInput.readOnly = true;
+    }
+
+    if (gradeSelect) {
+        gradeSelect.value = String(pendingReschedule.grade_level);
+        gradeSelect.disabled = true;
+    }
+    if (typeSelect) {
+        typeSelect.value = pendingReschedule.type;
+        typeSelect.disabled = true;
+    }
+    if (subjectSelect) {
+        const exists = Array.from(subjectSelect.options).some((opt) => opt.value === pendingReschedule.subject);
+        if (!exists) {
+            const option = document.createElement('option');
+            option.value = pendingReschedule.subject;
+            option.textContent = pendingReschedule.subject;
+            subjectSelect.appendChild(option);
+        }
+        subjectSelect.value = pendingReschedule.subject;
+        subjectSelect.disabled = true;
+    }
+    if (sectionSelect) {
+        if (pendingReschedule.section) {
+            const sectionExists = Array.from(sectionSelect.options).some((opt) => opt.value === pendingReschedule.section);
+            if (!sectionExists) {
+                const option = document.createElement('option');
+                option.value = pendingReschedule.section;
+                option.textContent = pendingReschedule.section;
+                sectionSelect.appendChild(option);
+            }
+            sectionSelect.value = pendingReschedule.section;
+        } else {
+            sectionSelect.value = '';
+        }
+        sectionSelect.disabled = true;
+    }
+}
+
+function clearRescheduleFields() {
+    const gradeSelect = document.getElementById('gradeSelect');
+    const subjectSelect = document.getElementById('subjectSelect');
+    const sectionSelect = document.getElementById('sectionSelect');
+    const typeSelect = document.getElementById('assessmentTypeSelect');
+    const titleInput = document.querySelector('#assessmentPanel input[name="title"]');
+
+    const rescheduleId = document.getElementById('rescheduleAssessmentId');
+    const rescheduleGradeHidden = document.getElementById('rescheduleGradeHidden');
+    const rescheduleSubjectHidden = document.getElementById('rescheduleSubjectHidden');
+    const rescheduleTypeHidden = document.getElementById('rescheduleTypeHidden');
+    const rescheduleSectionHidden = document.getElementById('rescheduleSectionHidden');
+
+    [rescheduleId, rescheduleGradeHidden, rescheduleSubjectHidden, rescheduleTypeHidden, rescheduleSectionHidden].forEach((el) => {
+        if (!el) return;
+        el.value = '';
+        el.disabled = true;
+    });
+
+    if (titleInput) {
+        titleInput.readOnly = false;
+        titleInput.value = '';
+    }
+    if (gradeSelect) {
+        gradeSelect.disabled = false;
+        gradeSelect.selectedIndex = 0;
+    }
+    if (subjectSelect) {
+        subjectSelect.disabled = false;
+        subjectSelect.selectedIndex = 0;
+    }
+    if (sectionSelect) {
+        sectionSelect.disabled = false;
+        sectionSelect.selectedIndex = 0;
+    }
+    if (typeSelect) typeSelect.disabled = false;
+}
+
+function openTeacherConfirmationsModal() {
+    if (!teacherConfirmationsModal) return;
+    teacherConfirmationsModal.classList.remove('hidden');
+    teacherConfirmationsModal.classList.add('flex');
+    teacherConfirmationsModal.style.display = 'flex';
+    document.body.classList.add('overflow-hidden');
+}
+
+function closeTeacherConfirmationsModal() {
+    if (!teacherConfirmationsModal) return;
+    teacherConfirmationsModal.classList.add('hidden');
+    teacherConfirmationsModal.classList.remove('flex');
+    teacherConfirmationsModal.style.display = 'none';
+    document.body.classList.remove('overflow-hidden');
+}
+
+function renderTeacherConfirmations(data) {
+    if (!teacherConfirmationsBody || !teacherConfirmationsStatus) return;
+    if (!Array.isArray(data) || data.length === 0) {
+        teacherConfirmationsBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">No pending confirmations.</td></tr>';
+        teacherConfirmationsStatus.textContent = 'No pending confirmations.';
+        return;
+    }
+
+    teacherConfirmationsBody.innerHTML = data.map((assessment) => {
+        const info = encodeURIComponent(JSON.stringify({
+            title: assessment.title ?? '',
+            type: assessment.type ?? '',
+            grade_level: assessment.grade_level ?? '',
+            subject: assessment.subject ?? '',
+            section: assessment.section ?? ''
+        }));
+        return `
+        <tr data-assessment-id="${assessment.id}" data-info="${info}">
+            <td class="px-4 py-3 font-semibold text-slate-800">${assessment.title}</td>
+            <td class="px-4 py-3 text-slate-600">${assessment.type}</td>
+            <td class="px-4 py-3 text-slate-600">${assessment.grade_level ?? '-'}</td>
+            <td class="px-4 py-3 text-slate-600">${assessment.subject ?? '-'}</td>
+            <td class="px-4 py-3 text-slate-500 text-xs">${assessment.scheduled_at ?? '-'}</td>
+            <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" data-action="conducted" class="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Conducted</button>
+                    <button type="button" data-action="not-conducted" class="rounded bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600">Not Conducted</button>
+                </div>
+            </td>
+        </tr>
+    `;
+    }).join('');
+    teacherConfirmationsStatus.textContent = `Showing ${data.length} assessment(s).`;
+}
+
+async function loadTeacherConfirmations() {
+    if (!teacherConfirmationsBody || !teacherConfirmationsStatus) return [];
+    teacherConfirmationsStatus.textContent = 'Loading...';
+    teacherConfirmationsBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+
+    try {
+        const response = await fetch('/api/teacher-confirmations');
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+        renderTeacherConfirmations(data);
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        teacherConfirmationsBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-red-500">Failed to load confirmations.</td></tr>';
+        teacherConfirmationsStatus.textContent = error?.message || 'Failed to load confirmations.';
+        return [];
+    }
+}
+
+async function postTeacherConfirmationAction(id, action) {
+    const token = getCsrfToken();
+    const response = await fetch(`/api/teacher-confirmations/${id}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': token
+        },
+        body: JSON.stringify({})
+    });
+    if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+    }
+    return response.json();
+}
+
+async function checkAndOpenConfirmationsWindow(force = false) {
+    if (userRole !== 'teacher' || !teacherConfirmationsModal) return;
+    const now = new Date();
+    const hour = now.getHours();
+    if (hour < 8) return;
+    if (hour >= 17) {
+        if (teacherConfirmationsModal && !teacherConfirmationsModal.classList.contains('hidden')) {
+            closeTeacherConfirmationsModal();
+        }
+        return;
+    }
+
+    if (confirmationAutoOpened && !force) return;
+    const data = await loadTeacherConfirmations();
+    if (Array.isArray(data) && data.length > 0) {
+        openTeacherConfirmationsModal();
+        confirmationAutoOpened = true;
+    }
+}
+
 function getTeacherCalendarFilters() {
     if (userRole !== 'teacher') {
         return { grade_level: '', section: '', subject: '' };
     }
 
     return appliedTeacherCalendarFilters;
+}
+
+function buildAdminFilterTypes() {
+    const types = [];
+    if (adminTypeScienceCore && adminTypeScienceCore.checked) types.push('science_core');
+    if (adminTypeElective && adminTypeElective.checked) types.push('elective');
+    return types;
+}
+
+function populateAdminSectionOptions() {
+    if (!adminAssessmentSectionFilter) return;
+    const grade = adminAssessmentGradeFilter ? adminAssessmentGradeFilter.value : '';
+    adminAssessmentSectionFilter.innerHTML = '<option value="">All Sections</option>';
+
+    const sections = grade && sectionsByGrade[grade] ? sectionsByGrade[grade] : Object.values(sectionsByGrade).flat();
+    Array.from(new Set(sections)).forEach((section) => {
+        const option = document.createElement('option');
+        option.value = section;
+        option.textContent = section;
+        adminAssessmentSectionFilter.appendChild(option);
+    });
+}
+
+function populateAdminSubjectOptions() {
+    if (!adminAssessmentSubjectFilter) return;
+    const grade = adminAssessmentGradeFilter ? parseInt(adminAssessmentGradeFilter.value, 10) : null;
+    const types = buildAdminFilterTypes();
+
+    const filtered = subjectCatalog.filter((subject) => {
+        if (grade && !(Number(subject.grade_level_start) <= grade && Number(subject.grade_level_end) >= grade)) {
+            return false;
+        }
+        if (types.length > 0 && !types.includes(subject.type)) {
+            return false;
+        }
+        return true;
+    }).map((subject) => subject.name);
+
+    const unique = Array.from(new Set(filtered)).sort();
+    adminAssessmentSubjectFilter.innerHTML = '<option value="">All Subjects</option>';
+    unique.forEach((name) => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        adminAssessmentSubjectFilter.appendChild(option);
+    });
+}
+
+function buildAdminAssessmentParams() {
+    const params = new URLSearchParams();
+    const grade = adminAssessmentGradeFilter ? adminAssessmentGradeFilter.value : '';
+    const section = adminAssessmentSectionFilter ? adminAssessmentSectionFilter.value : '';
+    const subject = adminAssessmentSubjectFilter ? adminAssessmentSubjectFilter.value : '';
+    const types = buildAdminFilterTypes();
+
+    if (grade) params.set('grade_level', grade);
+    if (section) params.set('section', section);
+    if (subject) params.set('subject', subject);
+    if (types.length > 0) params.set('types', types.join(','));
+
+    return params;
+}
+
+async function loadAdminAssessments() {
+    if (!adminAssessmentsBody || !adminAssessmentsStatus) return;
+    adminAssessmentsStatus.textContent = 'Loading...';
+    adminAssessmentsBody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+
+    try {
+        const params = buildAdminAssessmentParams();
+        const response = await fetch(`/api/admin-assessments?${params.toString()}`);
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+            adminAssessmentsBody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">No assessments found.</td></tr>';
+            adminAssessmentsStatus.textContent = 'No assessments scheduled.';
+            return;
+        }
+
+        adminAssessmentsBody.innerHTML = data.map((assessment) => `
+            <tr>
+                <td class="px-4 py-3 font-semibold text-slate-800">${assessment.title}</td>
+                <td class="px-4 py-3 text-slate-600">${assessment.type}</td>
+                <td class="px-4 py-3 text-slate-600">${assessment.grade_level ?? '-'}</td>
+                <td class="px-4 py-3 text-slate-600">${assessment.section ?? '-'}</td>
+                <td class="px-4 py-3 text-slate-600">${assessment.subject ?? '-'}</td>
+                <td class="px-4 py-3 text-slate-600">${assessment.subject_type ?? '-'}</td>
+                <td class="px-4 py-3 text-slate-500 text-xs">${assessment.scheduled_at ?? '-'}</td>
+            </tr>
+        `).join('');
+        adminAssessmentsStatus.textContent = `Showing ${data.length} assessment(s).`;
+    } catch (error) {
+        adminAssessmentsBody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-red-500">Failed to load assessments.</td></tr>';
+        adminAssessmentsStatus.textContent = error?.message || 'Failed to load assessments.';
+    }
+}
+
+let adminAssessmentsReloadTimer = null;
+function scheduleAdminAssessmentsReload() {
+    if (adminAssessmentsReloadTimer) {
+        clearTimeout(adminAssessmentsReloadTimer);
+    }
+    adminAssessmentsReloadTimer = setTimeout(() => {
+        loadAdminAssessments();
+    }, 200);
 }
 
 function openTeacherCalendarFilterPanel() {
@@ -690,6 +1373,7 @@ function renderHoverAssessments(assessments) {
             <div class="text-[11px] uppercase tracking-wide font-bold text-blue-600">${a.subject}</div>
             <div class="font-semibold text-gray-800">${a.title}</div>
             <div class="text-xs text-gray-500">${a.due_time}</div>
+            <div class="text-[11px] text-gray-400">${a.teacher ? `By ${a.teacher}` : ''}</div>
         </div>
     `).join('');
 }
@@ -703,6 +1387,9 @@ async function openHoverCard(day, dateString, targetEl) {
 
     hoverCardDateTitle.innerText = `Assessments on ${dateString}`;
     hoverScheduleBtn.classList.toggle('hidden', userRole !== 'teacher');
+    if (userRole === 'teacher') {
+        updateScheduleAvailability(isoDate);
+    }
     positionHoverCard(targetEl);
     hoverCard.classList.remove('opacity-0', 'pointer-events-none', '-translate-y-1');
     hoverCard.classList.add('opacity-100', 'translate-y-0');
@@ -1225,11 +1912,227 @@ if (userRole === 'teacher') {
             positionTeacherCalendarFilterPanel();
         }
     }, { passive: true });
+
+    const openTeacherAssessmentsBtn = document.getElementById('openTeacherAssessmentsBtn');
+    const teacherAssessmentsModal = document.getElementById('teacherAssessmentsModal');
+    const closeTeacherAssessmentsBtn = document.getElementById('closeTeacherAssessmentsBtn');
+    const teacherAssessmentsBody = document.getElementById('teacherAssessmentsBody');
+    const teacherAssessmentsStatus = document.getElementById('teacherAssessmentsStatus');
+
+    async function loadTeacherAssessments() {
+        if (!teacherAssessmentsBody || !teacherAssessmentsStatus) return;
+        teacherAssessmentsStatus.textContent = 'Loading...';
+        teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+
+        try {
+            const response = await fetch('/api/teacher-assessments');
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`);
+            }
+            const data = await response.json();
+
+            if (!Array.isArray(data) || data.length === 0) {
+                teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">No assessments found.</td></tr>';
+                teacherAssessmentsStatus.textContent = 'No assessments scheduled.';
+                return;
+            }
+
+            teacherAssessmentsBody.innerHTML = data.map((assessment) => `
+                <tr>
+                    <td class="px-4 py-3 font-semibold text-slate-800">${assessment.title}</td>
+                    <td class="px-4 py-3 text-slate-600">${assessment.type}</td>
+                    <td class="px-4 py-3 text-slate-600">${assessment.grade_level ?? '-'}</td>
+                    <td class="px-4 py-3 text-slate-600">${assessment.subject ?? '-'}</td>
+                    <td class="px-4 py-3 text-slate-500 text-xs">${assessment.scheduled_at ?? '-'}</td>
+                </tr>
+            `).join('');
+            teacherAssessmentsStatus.textContent = `Showing ${data.length} assessment(s).`;
+        } catch (error) {
+            teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-red-500">Failed to load assessments.</td></tr>';
+            teacherAssessmentsStatus.textContent = error?.message || 'Failed to load assessments.';
+        }
+    }
+
+    if (openTeacherAssessmentsBtn && teacherAssessmentsModal) {
+        openTeacherAssessmentsBtn.addEventListener('click', () => {
+            teacherAssessmentsModal.classList.remove('hidden');
+            teacherAssessmentsModal.classList.add('flex');
+            teacherAssessmentsModal.style.display = 'flex';
+            document.body.classList.add('overflow-hidden');
+            loadTeacherAssessments();
+        });
+    }
+
+    if (closeTeacherAssessmentsBtn && teacherAssessmentsModal) {
+        closeTeacherAssessmentsBtn.addEventListener('click', () => {
+            teacherAssessmentsModal.classList.add('hidden');
+            teacherAssessmentsModal.classList.remove('flex');
+            teacherAssessmentsModal.style.display = 'none';
+            document.body.classList.remove('overflow-hidden');
+        });
+    }
+
+    if (teacherAssessmentsModal) {
+        teacherAssessmentsModal.addEventListener('click', (event) => {
+            if (event.target === teacherAssessmentsModal) {
+                teacherAssessmentsModal.classList.add('hidden');
+                teacherAssessmentsModal.classList.remove('flex');
+                teacherAssessmentsModal.style.display = 'none';
+                document.body.classList.remove('overflow-hidden');
+            }
+        });
+    }
+
+    if (openTeacherConfirmationsBtn && teacherConfirmationsModal) {
+        openTeacherConfirmationsBtn.addEventListener('click', () => {
+            openTeacherConfirmationsModal();
+            loadTeacherConfirmations();
+        });
+    }
+
+    if (closeTeacherConfirmationsBtn && teacherConfirmationsModal) {
+        closeTeacherConfirmationsBtn.addEventListener('click', () => {
+            closeTeacherConfirmationsModal();
+        });
+    }
+
+    if (teacherConfirmationsModal) {
+        teacherConfirmationsModal.addEventListener('click', (event) => {
+            if (event.target === teacherConfirmationsModal) {
+                closeTeacherConfirmationsModal();
+            }
+        });
+    }
+
+    if (teacherConfirmationsBody) {
+        teacherConfirmationsBody.addEventListener('click', async (event) => {
+            const btn = event.target.closest('button[data-action]');
+            if (!btn) return;
+            const row = btn.closest('tr');
+            const id = row?.dataset?.assessmentId;
+            if (!id) return;
+            const action = btn.dataset.action;
+
+            btn.disabled = true;
+            btn.classList.add('opacity-60');
+            try {
+                await postTeacherConfirmationAction(id, action);
+                if (action === 'not-conducted') {
+                    let info = {};
+                    if (row.dataset.info) {
+                        try {
+                            info = JSON.parse(decodeURIComponent(row.dataset.info));
+                        } catch {}
+                    }
+                    const parsedGrade = Number(info.grade_level);
+                    const gradeValue = Number.isFinite(parsedGrade) && parsedGrade > 0 ? parsedGrade : '';
+                    pendingReschedule = {
+                        id: Number(id),
+                        title: info.title || 'Assessment',
+                        type: info.type || '',
+                        grade_level: gradeValue,
+                        subject: info.subject || '',
+                        section: info.section || ''
+                    };
+                    closeTeacherConfirmationsModal();
+                    showRoleFlash('Choose a new day on the calendar to reschedule this assessment.');
+                    document.getElementById('calendar-tab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    const rows = await loadTeacherConfirmations();
+                    if (rows.length === 0) {
+                        closeTeacherConfirmationsModal();
+                    }
+                }
+            } catch (error) {
+                showRoleFlash(error?.message || 'Failed to update confirmation.', '#dc2626');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60');
+            }
+        });
+    }
+
+    if (teacherConfirmationsModal && userRole === 'teacher') {
+        checkAndOpenConfirmationsWindow(true);
+        setInterval(() => {
+            checkAndOpenConfirmationsWindow(false);
+        }, 60000);
+    }
+
+    window.teacherAssessmentsModalBound = true;
 }
 
 if (hoverCard) {
     hoverCard.addEventListener('mouseenter', () => clearTimeout(hoverHideTimer));
     hoverCard.addEventListener('mouseleave', queueHideHoverCard);
+}
+
+if (openAdminAssessmentsBtn && adminAssessmentsModal) {
+    openAdminAssessmentsBtn.addEventListener('click', () => {
+        adminAssessmentsModal.classList.remove('hidden');
+        adminAssessmentsModal.classList.add('flex');
+        adminAssessmentsModal.style.display = 'flex';
+        document.body.classList.add('overflow-hidden');
+        populateAdminSectionOptions();
+        populateAdminSubjectOptions();
+        loadAdminAssessments();
+    });
+}
+
+if (closeAdminAssessmentsBtn && adminAssessmentsModal) {
+    closeAdminAssessmentsBtn.addEventListener('click', () => {
+        adminAssessmentsModal.classList.add('hidden');
+        adminAssessmentsModal.classList.remove('flex');
+        adminAssessmentsModal.style.display = 'none';
+        document.body.classList.remove('overflow-hidden');
+    });
+}
+
+if (adminAssessmentsModal) {
+    adminAssessmentsModal.addEventListener('click', (event) => {
+        if (event.target === adminAssessmentsModal) {
+            adminAssessmentsModal.classList.add('hidden');
+            adminAssessmentsModal.classList.remove('flex');
+            adminAssessmentsModal.style.display = 'none';
+            document.body.classList.remove('overflow-hidden');
+        }
+    });
+}
+
+if (adminAssessmentGradeFilter) {
+    adminAssessmentGradeFilter.addEventListener('change', () => {
+        populateAdminSectionOptions();
+        populateAdminSubjectOptions();
+        scheduleAdminAssessmentsReload();
+    });
+}
+
+if (adminTypeScienceCore) {
+    adminTypeScienceCore.addEventListener('change', () => {
+        populateAdminSubjectOptions();
+        scheduleAdminAssessmentsReload();
+    });
+}
+
+if (adminTypeElective) {
+    adminTypeElective.addEventListener('change', () => {
+        populateAdminSubjectOptions();
+        scheduleAdminAssessmentsReload();
+    });
+}
+
+if (adminAssessmentsApplyFilters) {
+    adminAssessmentsApplyFilters.addEventListener('click', () => {
+        loadAdminAssessments();
+    });
+}
+
+if (adminAssessmentSectionFilter) {
+    adminAssessmentSectionFilter.addEventListener('change', scheduleAdminAssessmentsReload);
+}
+
+if (adminAssessmentSubjectFilter) {
+    adminAssessmentSubjectFilter.addEventListener('change', scheduleAdminAssessmentsReload);
 }
 
 window.addEventListener('scroll', hideHoverCard, { passive: true });
@@ -1252,6 +2155,79 @@ renderTeacherSubjectOptions();
 renderTeacherSectionOptions();
 refreshCalendarNotifications();
     </script>
+    <script>
+        if (!window.teacherAssessmentsModalBound) {
+            const openTeacherAssessmentsBtn = document.getElementById('openTeacherAssessmentsBtn');
+            const teacherAssessmentsModal = document.getElementById('teacherAssessmentsModal');
+            const closeTeacherAssessmentsBtn = document.getElementById('closeTeacherAssessmentsBtn');
+            const teacherAssessmentsBody = document.getElementById('teacherAssessmentsBody');
+            const teacherAssessmentsStatus = document.getElementById('teacherAssessmentsStatus');
+
+            async function loadTeacherAssessmentsFallback() {
+                if (!teacherAssessmentsBody || !teacherAssessmentsStatus) return;
+                teacherAssessmentsStatus.textContent = 'Loading...';
+                teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+
+                try {
+                    const response = await fetch('/api/teacher-assessments');
+                    if (!response.ok) {
+                        throw new Error(`Request failed with status ${response.status}`);
+                    }
+                    const data = await response.json();
+
+                    if (!Array.isArray(data) || data.length === 0) {
+                        teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">No assessments found.</td></tr>';
+                        teacherAssessmentsStatus.textContent = 'No assessments scheduled.';
+                        return;
+                    }
+
+                    teacherAssessmentsBody.innerHTML = data.map((assessment) => `
+                        <tr>
+                            <td class="px-4 py-3 font-semibold text-slate-800">${assessment.title}</td>
+                            <td class="px-4 py-3 text-slate-600">${assessment.type}</td>
+                            <td class="px-4 py-3 text-slate-600">${assessment.grade_level ?? '-'}</td>
+                            <td class="px-4 py-3 text-slate-600">${assessment.subject ?? '-'}</td>
+                            <td class="px-4 py-3 text-slate-500 text-xs">${assessment.scheduled_at ?? '-'}</td>
+                        </tr>
+                    `).join('');
+                    teacherAssessmentsStatus.textContent = `Showing ${data.length} assessment(s).`;
+                } catch (error) {
+                    teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-red-500">Failed to load assessments.</td></tr>';
+                    teacherAssessmentsStatus.textContent = error?.message || 'Failed to load assessments.';
+                }
+            }
+
+            if (openTeacherAssessmentsBtn && teacherAssessmentsModal) {
+                openTeacherAssessmentsBtn.addEventListener('click', () => {
+                    teacherAssessmentsModal.classList.remove('hidden');
+                    teacherAssessmentsModal.classList.add('flex');
+                    teacherAssessmentsModal.style.display = 'flex';
+                    document.body.classList.add('overflow-hidden');
+                    loadTeacherAssessmentsFallback();
+                });
+            }
+
+            if (closeTeacherAssessmentsBtn && teacherAssessmentsModal) {
+                closeTeacherAssessmentsBtn.addEventListener('click', () => {
+                    teacherAssessmentsModal.classList.add('hidden');
+                    teacherAssessmentsModal.classList.remove('flex');
+                    teacherAssessmentsModal.style.display = 'none';
+                    document.body.classList.remove('overflow-hidden');
+                });
+            }
+
+            if (teacherAssessmentsModal) {
+                teacherAssessmentsModal.addEventListener('click', (event) => {
+                    if (event.target === teacherAssessmentsModal) {
+                        teacherAssessmentsModal.classList.add('hidden');
+                        teacherAssessmentsModal.classList.remove('flex');
+                        teacherAssessmentsModal.style.display = 'none';
+                        document.body.classList.remove('overflow-hidden');
+                    }
+                });
+            }
+        }
+    </script>
     <div id="panelOverlay" class="panel-overlay" onclick="closeAllPanels()"></div>
     
 <div id="assessmentPanel" class="side-panel">
@@ -1262,6 +2238,11 @@ refreshCalendarNotifications();
     <div class="panel-body">
         <form action="{{ route('assessments.store') }}" method="POST" class="mini-form">
             @csrf
+            <input type="hidden" name="reschedule_assessment_id" id="rescheduleAssessmentId" disabled>
+            <input type="hidden" name="grade_level" id="rescheduleGradeHidden" disabled>
+            <input type="hidden" name="subject" id="rescheduleSubjectHidden" disabled>
+            <input type="hidden" name="type" id="rescheduleTypeHidden" disabled>
+            <input type="hidden" name="section" id="rescheduleSectionHidden" disabled>
             <input type="hidden" name="due_date" id="hiddenDate">
 
             <div class="form-group mb-4">
@@ -1351,3 +2332,4 @@ refreshCalendarNotifications();
 </div>
 </body>
 </html>
+
