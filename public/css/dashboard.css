@@ -267,7 +267,12 @@ select {
 
 .dot-alternative { background: #7c3aed; }
 .dot-formative { background: #3b82f6; }
-.dot-longtest { background: #10b981; }
+.dot-longtest-1 { background: #22c55e; }
+.dot-longtest-2 { background: #ef4444; }
+.calendar-day.week-full,
+.calendar-day.reschedule-day.week-full {
+  background: rgba(239, 68, 68, 0.18) !important;
+}
 
 /* Calendar Day Hover Effect */
 .calendar-day:not(.empty):hover {

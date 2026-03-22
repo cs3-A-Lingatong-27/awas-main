@@ -54,11 +54,7 @@
             @endif
         </div>
 
-        <div class="flex items-center justify-between gap-4 pt-2">
-            <a href="{{ route('register') }}" class="text-sm text-slate-600 hover:text-slate-900">
-                No account yet? <span class="font-semibold">Create one</span>
-            </a>
-
+        <div class="flex items-center justify-end gap-4 pt-2">
             <x-primary-button class="rounded-xl bg-sky-600 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-sky-700 focus:bg-sky-700 active:bg-sky-800 focus:ring-sky-500">
                 {{ __('Log in') }}
             </x-primary-button>

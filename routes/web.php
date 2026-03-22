@@ -477,6 +477,23 @@ Route::get('/api/assessments-by-date', function (Request $request) {
     
     if ($user && $user->role === 'student') {
         $query->where('grade_level', $user->grade_level);
+        $studentSection = null;
+        $studentSectionRow = StudentGradeSection::where('user_id', $user->id)->first();
+        if ($studentSectionRow && $studentSectionRow->section) {
+            $studentSection = $studentSectionRow->section;
+        } elseif (!empty($user->section)) {
+            $studentSection = $user->section;
+        }
+
+        if ($studentSection) {
+            $query->where(function ($q) use ($studentSection) {
+                $q->whereNull('section')
+                  ->orWhere('section', $studentSection)
+                  ->orWhere('description', 'like', '%Section: ' . $studentSection . '%');
+            });
+        } else {
+            $query->whereNull('section');
+        }
     } elseif ($user && $user->role === 'teacher') {
         $assignedGrades = is_array($user->assigned_grades) ? $user->assigned_grades : (json_decode($user->assigned_grades, true) ?? []);
         $assignedGrades = array_map('intval', $assignedGrades);
@@ -496,7 +513,9 @@ Route::get('/api/assessments-by-date', function (Request $request) {
         $query->where('grade_level', (int) $filterGrade);
     }
 
-    if ($filterSection !== null && $filterSection !== '') {
+    if ($user && $user->role === 'student') {
+        // Students cannot override their section filter.
+    } elseif ($filterSection !== null && $filterSection !== '') {
         $query->where(function ($q) use ($filterSection) {
             $q->where('section', $filterSection)
               ->orWhere('description', 'like', '%Section: ' . $filterSection . '%');
@@ -532,57 +551,84 @@ Route::get('/api/assessments-by-date', function (Request $request) {
         $filterSection = $request->query('section');
         $filterSubject = $request->query('subject');
 
-        $query = Assessment::whereMonth('scheduled_at', $month)
-            ->whereYear('scheduled_at', $year)
-            ->whereNotNull('scheduled_at');
+        $baseQuery = Assessment::whereNotNull('scheduled_at');
         
         if ($user && $user->role === 'student') {
-            $query->where('grade_level', $user->grade_level);
+            $baseQuery->where('grade_level', $user->grade_level);
+            $studentSection = null;
+            $studentSectionRow = StudentGradeSection::where('user_id', $user->id)->first();
+            if ($studentSectionRow && $studentSectionRow->section) {
+                $studentSection = $studentSectionRow->section;
+            } elseif (!empty($user->section)) {
+                $studentSection = $user->section;
+            }
+
+            if ($studentSection) {
+                $baseQuery->where(function ($q) use ($studentSection) {
+                    $q->whereNull('section')
+                      ->orWhere('section', $studentSection)
+                      ->orWhere('description', 'like', '%Section: ' . $studentSection . '%');
+                });
+            } else {
+                $baseQuery->whereNull('section');
+            }
         } elseif ($user && $user->role === 'teacher') {
             $assignedGrades = is_array($user->assigned_grades) ? $user->assigned_grades : (json_decode($user->assigned_grades, true) ?? []);
             $assignedGrades = array_map('intval', $assignedGrades);
             if (empty($assignedGrades)) {
                 return collect();
             }
-            $query->whereIn('grade_level', $assignedGrades);
+            $baseQuery->whereIn('grade_level', $assignedGrades);
 
             if ($filterGrade !== null && $filterGrade !== '') {
                 $filterGradeInt = (int) $filterGrade;
                 if (!in_array($filterGradeInt, $assignedGrades, true)) {
                     return collect();
                 }
-                $query->where('grade_level', $filterGradeInt);
+                $baseQuery->where('grade_level', $filterGradeInt);
             }
         } elseif ($filterGrade !== null && $filterGrade !== '') {
-            $query->where('grade_level', (int) $filterGrade);
+            $baseQuery->where('grade_level', (int) $filterGrade);
         }
 
-        if ($filterSection !== null && $filterSection !== '') {
-            $query->where(function ($q) use ($filterSection) {
+        if ($user && $user->role === 'student') {
+            // Students cannot override their section filter.
+        } elseif ($filterSection !== null && $filterSection !== '') {
+            $baseQuery->where(function ($q) use ($filterSection) {
                 $q->where('section', $filterSection)
                   ->orWhere('description', 'like', '%Section: ' . $filterSection . '%');
             });
         }
 
         if ($filterSubject !== null && $filterSubject !== '') {
-            $query->where('description', 'like', '%Subject: ' . $filterSubject . '%');
+            $baseQuery->where('description', 'like', '%Subject: ' . $filterSubject . '%');
         }
 
-        return $query->get()
+        $monthStart = Carbon::createFromDate((int) $year, (int) $month, 1)->startOfMonth();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+        $extendedStart = $monthStart->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $extendedEnd = $monthEnd->copy()->startOfWeek(Carbon::MONDAY)->addDays(4)->endOfDay();
+
+        $countsByDay = (clone $baseQuery)
+            ->whereBetween('scheduled_at', [$monthStart, $monthEnd])
+            ->get()
             ->groupBy(fn($val) => Carbon::parse($val->scheduled_at)->format('j'))
             ->map(function ($items) {
                 $counts = [
                     'formative' => 0,
                     'alternative' => 0,
-                    'long_test' => 0,
+                    'long_test_1' => 0,
+                    'long_test_2' => 0,
                 ];
 
                 foreach ($items as $assessment) {
                     $type = $assessment->type;
                     if ($type === 'Formative Assessment') {
                         $counts['formative']++;
-                    } elseif ($type === 'Long Test') {
-                        $counts['long_test']++;
+                    } elseif ($type === 'Long Test 1 (Midterms)') {
+                        $counts['long_test_1']++;
+                    } elseif (in_array($type, ['Long Test 2 (Quarterly Exam)', 'Long Test'], true)) {
+                        $counts['long_test_2']++;
                     } elseif ($type === 'Alternative Assessment (AA)' || $type === 'Alternative Assessment') {
                         $counts['alternative']++;
                     }
@@ -590,6 +636,32 @@ Route::get('/api/assessments-by-date', function (Request $request) {
 
                 return $counts;
             });
+
+        $weeklyAssessments = (clone $baseQuery)
+            ->whereBetween('scheduled_at', [$extendedStart, $extendedEnd])
+            ->whereIn('type', ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment'])
+            ->get();
+
+        $weekCounts = [];
+        foreach ($weeklyAssessments as $assessment) {
+            $weekKey = Carbon::parse($assessment->scheduled_at)->startOfWeek(Carbon::MONDAY)->format('Y-m-d');
+            $weekCounts[$weekKey] = ($weekCounts[$weekKey] ?? 0) + 1;
+        }
+
+        $daysInMonth = $monthStart->daysInMonth;
+        $weekFullDays = [];
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $date = Carbon::createFromDate((int) $year, (int) $month, $day);
+            $weekKey = $date->copy()->startOfWeek(Carbon::MONDAY)->format('Y-m-d');
+            if (($weekCounts[$weekKey] ?? 0) >= 5) {
+                $weekFullDays[] = $day;
+            }
+        }
+
+        return response()->json([
+            'counts' => $countsByDay,
+            'week_full_days' => $weekFullDays,
+        ]);
     });
 
     /**
@@ -767,9 +839,16 @@ Route::get('/api/assessments-by-date', function (Request $request) {
             ])->withInput();
         }
 
+        $email = strtolower(trim($validated['email']));
+        if (User::whereRaw('lower(email) = ?', [$email])->exists()) {
+            return back()->withErrors([
+                'email' => 'Email already exists.',
+            ])->withInput();
+        }
+
         $student = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
+            'email' => $email,
             'password' => bcrypt($validated['password']),
             'role' => 'student',
             'grade_level' => $gradeLevel,
@@ -918,44 +997,59 @@ Route::get('/api/check-conflict', function (Request $request) {
     $date = $request->query('date');
     $grade = $request->query('grade_level');
     $type = $request->query('type');
+    $assessmentId = $request->query('assessment_id');
 
     if (!$date || !$grade) return response()->json(['status' => 'SAFE']);
 
-    $faCount = Assessment::whereDate('scheduled_at', $date)
-        ->where('grade_level', $grade)
-        ->where('type', 'Formative Assessment')
-        ->count();
+    $weekStart = Carbon::parse($date)->startOfWeek(Carbon::MONDAY)->startOfDay();
+    $weekEnd = $weekStart->copy()->addDays(4)->endOfDay();
 
-    $aaCount = Assessment::whereDate('scheduled_at', $date)
+    $weeklyQuery = Assessment::whereBetween('scheduled_at', [$weekStart, $weekEnd])
         ->where('grade_level', $grade)
-        ->whereIn('type', ['Alternative Assessment (AA)', 'Alternative Assessment'])
-        ->count();
+        ->whereIn('type', ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment']);
+    if ($assessmentId) {
+        $weeklyQuery->where('id', '!=', $assessmentId);
+    }
+    $weeklyCount = $weeklyQuery->count();
 
-    // Type-aware checks for scheduling panel.
-    if ($type === 'Formative Assessment' && $faCount >= 2) {
+    $isFormative = $type === 'Formative Assessment';
+    $isAlternative = $type === 'Alternative Assessment (AA)' || $type === 'Alternative Assessment';
+
+    if (($isFormative || $isAlternative) && $weeklyCount >= 5) {
         return response()->json([
             'status' => 'CRITICAL',
-            'message' => "Conflict! This day already has 2 Formative Assessments for this grade."
+            'message' => 'Conflict! This week already has 5 assessments for this grade.'
         ]);
     }
 
-    if (($type === 'Alternative Assessment (AA)' || $type === 'Alternative Assessment') && $aaCount >= 1) {
-        return response()->json([
-            'status' => 'CRITICAL',
-            'message' => "Conflict! This day already has 1 Alternative Assessment for this grade."
-        ]);
+    $user = auth()->user();
+    if ($type === 'Long Test 1 (Midterms)' && $user && $user->role === 'teacher') {
+        $monthStart = Carbon::parse($date)->startOfMonth()->startOfDay();
+        $monthEnd = Carbon::parse($date)->endOfMonth()->endOfDay();
+        $ltQuery = Assessment::whereBetween('scheduled_at', [$monthStart, $monthEnd])
+            ->where('grade_level', $grade)
+            ->where('user_id', $user->id)
+            ->where('type', 'Long Test 1 (Midterms)');
+        if ($assessmentId) {
+            $ltQuery->where('id', '!=', $assessmentId);
+        }
+        if ($ltQuery->count() >= 1) {
+            return response()->json([
+                'status' => 'CRITICAL',
+                'message' => 'Only 1 Long Test 1 (Midterms) per month is allowed for this grade.'
+            ]);
+        }
     }
 
-    // Backward-safe generic behavior if type is not provided.
-    if (!$type && ($faCount >= 2 || $aaCount >= 1)) {
+    if (!$type && $weeklyCount >= 5) {
         return response()->json([
             'status' => 'CRITICAL',
-            'message' => "Conflict! This day already reached the type limit for this grade."
+            'message' => 'Conflict! This week already has 5 assessments for this grade.'
         ]);
     }
 
     return response()->json([
-        'status' => ($faCount > 0 || $aaCount > 0) ? 'WARNING' : 'SAFE',
+        'status' => 'SAFE',
         'message' => 'Safe to schedule.'
     ]);
 });

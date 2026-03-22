@@ -23,7 +23,19 @@ public function index()
     } else {
         // Students see only THEIR specific grade level
         // Assuming students have a 'grade_level' column in the users table
-        $assessments = Assessment::where('grade_level', $user->grade_level)->orderBy('scheduled_at', 'asc')->get();
+        $studentSection = $user->section;
+        $assessments = Assessment::where('grade_level', $user->grade_level)
+            ->when($studentSection, function ($query) use ($studentSection) {
+                $query->where(function ($q) use ($studentSection) {
+                    $q->whereNull('section')
+                      ->orWhere('section', $studentSection)
+                      ->orWhere('description', 'like', '%Section: ' . $studentSection . '%');
+                });
+            }, function ($query) {
+                $query->whereNull('section');
+            })
+            ->orderBy('scheduled_at', 'asc')
+            ->get();
     }
 
     return view('dashboard', compact('assessments'));
@@ -43,9 +55,6 @@ public function index()
     public function store(Request $request)
     {
         $user = auth()->user();
-        if ($user->role === 'admin') {
-            return back()->with('error', 'Admins can only view assessments in the calendar.');
-        }
 
         $allowedGrades = is_array($user->assigned_grades) ? $user->assigned_grades : json_decode($user->assigned_grades, true) ?? [];
         $allowedSubjects = is_array($user->assigned_subjects) ? $user->assigned_subjects : json_decode($user->assigned_subjects, true) ?? [];
@@ -193,7 +202,14 @@ public function index()
             $subjectName = $rescheduleAssessment->subject ? $rescheduleAssessment->subject->name : $subjectName;
         }
 
-        if (!in_array($grade, $allowedGrades) || !in_array($subjectName, $allowedSubjects)) {
+        $isLongTest1 = $type === 'Long Test 1 (Midterms)';
+        $isLongTest2 = in_array($type, ['Long Test 2 (Quarterly Exam)', 'Long Test'], true);
+
+        if ($user->role === 'admin') {
+            if (!$isLongTest2) {
+                return back()->with('error', 'Admins can only schedule Long Test 2 (Quarterly Exam).');
+            }
+        } elseif (!in_array($grade, $allowedGrades) || !in_array($subjectName, $allowedSubjects)) {
             return back()->with('error', "Unauthorized: You are not assigned to this Grade or Subject.");
         }
 
@@ -212,6 +228,41 @@ public function index()
             ->where('grade_level_start', '<=', $requestedGrade)
             ->where('grade_level_end', '>=', $requestedGrade)
             ->first();
+
+        if ($isLongTest2 && $user->role !== 'admin') {
+            return back()->with('error', 'Only administrators can schedule Long Test 2 (Quarterly Exam).');
+        }
+
+        if ($isLongTest1 && $user->role === 'teacher') {
+            $isAllowedLongTest1 =
+                stripos($subjectName, 'Computer Science') !== false ||
+                stripos($subjectName, 'Integrated Science') !== false ||
+                stripos($subjectName, 'Mathematics') !== false;
+
+            if (!$isAllowedLongTest1 && $subjectMeta && $subjectMeta->type === 'elective') {
+                $isAllowedLongTest1 =
+                    stripos($subjectName, 'Biology') !== false ||
+                    stripos($subjectName, 'Chemistry') !== false ||
+                    stripos($subjectName, 'Physics') !== false;
+            }
+
+            if (!$isAllowedLongTest1) {
+                return back()->with('error', 'Long Test 1 (Midterms) is only allowed for Computer Science, Integrated Science, Mathematics, and Bio/Chem/Physics electives.');
+            }
+
+            $monthStart = Carbon::parse($date)->startOfMonth()->startOfDay();
+            $monthEnd = Carbon::parse($date)->endOfMonth()->endOfDay();
+            $monthlyQuery = Assessment::where('user_id', $user->id)
+                ->where('grade_level', $grade)
+                ->where('type', 'Long Test 1 (Midterms)')
+                ->whereBetween('scheduled_at', [$monthStart, $monthEnd]);
+            if ($rescheduleAssessment) {
+                $monthlyQuery->where('id', '!=', $rescheduleAssessment->id);
+            }
+            if ($monthlyQuery->count() >= 1) {
+                return back()->with('error', "Only 1 Long Test 1 (Midterms) per month is allowed for Grade $grade.");
+            }
+        }
 
         $isScienceCoreExempt = $subjectMeta && $subjectMeta->type === 'science_core' && in_array($requestedGrade, [11, 12], true);
         $isElectiveExempt = $subjectMeta && $subjectMeta->type === 'elective' && $requestedGrade >= 10 && $requestedGrade <= 12;
@@ -246,32 +297,23 @@ public function index()
         }
         $section = $sectionInput ? implode(', ', $sectionList) : null;
 
-        // 3. THE AWAS ALGORITHM (Conflict Detection)
-        if ($type === 'Formative Assessment') {
-            $faCount = Assessment::whereDate('scheduled_at', $date)
+        // 3. THE AWAS ALGORITHM (Weekly combined cap for FA/AA)
+        if (in_array($type, ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment'], true)) {
+            $weekStart = Carbon::parse($date)->startOfWeek(Carbon::MONDAY)->startOfDay();
+            $weekEnd = $weekStart->copy()->addDays(4)->endOfDay();
+
+            $weeklyQuery = Assessment::whereBetween('scheduled_at', [$weekStart, $weekEnd])
                 ->where('grade_level', $grade)
-                ->where('type', 'Formative Assessment')
-                ->count();
+                ->whereIn('type', ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment']);
 
-            if ($faCount >= 2) {
-                return back()->with('error', "Conflict! Grade $grade already has 2 Formative Assessments on this day.");
+            if ($rescheduleAssessment) {
+                $weeklyQuery->where('id', '!=', $rescheduleAssessment->id);
             }
-        }
 
-        if ($type === 'Alternative Assessment (AA)') {
-            $aaCount = Assessment::whereDate('scheduled_at', $date)
-                ->where('grade_level', $grade)
-                ->whereIn('type', ['Alternative Assessment (AA)', 'Alternative Assessment'])
-                ->count();
-
-            if ($aaCount >= 1) {
-                return back()->with('error', "Conflict! Grade $grade already has 1 Alternative Assessment on this day.");
+            $weeklyCount = $weeklyQuery->count();
+            if ($weeklyCount >= 5) {
+                return back()->with('error', "Conflict! Grade $grade already has 5 assessments this week.");
             }
-        }
-
-        // Admin-only Long Test check
-        if ($type === 'Long Test' && $user->role !== 'admin') {
-            return back()->with('error', "Only administrators can schedule Long Tests.");
         }
 
         if ($rescheduleAssessment) {

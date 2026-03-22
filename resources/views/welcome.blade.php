@@ -45,9 +45,6 @@
                         <a href="{{ route('login') }}" class="auth-btn inline-flex w-full items-center justify-center">
                             Log In
                         </a>
-                        <a href="{{ route('register') }}" class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 transition hover:bg-slate-50">
-                            Teacher/Admin Registration
-                        </a>
                     </div>
                 </div>
             </div>

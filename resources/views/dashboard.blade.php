@@ -282,8 +282,14 @@
                 <div class="calendar-legend">
                     <span class="legend-item"><span class="calendar-dot dot-alternative"></span> Alternative Assessment</span>
                     <span class="legend-item"><span class="calendar-dot dot-formative"></span> Formative Assessment</span>
-                    <span class="legend-item"><span class="calendar-dot dot-longtest"></span> Long Test</span>
+                    <span class="legend-item"><span class="calendar-dot dot-longtest-1"></span> Long Test 1 (Midterms)</span>
+                    <span class="legend-item"><span class="calendar-dot dot-longtest-2"></span> Long Test 2 (Quarterly Exam)</span>
                 </div>
+                @if(auth()->user()->role === 'teacher' || auth()->user()->role === 'admin')
+                    <div id="weekStatusBanner" class="mt-3 hidden rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700">
+                        This week is full (5 assessments). Formative/Alternative scheduling disabled. Long Tests still allowed.
+                    </div>
+                @endif
                 
                 <div class="calendar-nav" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
                     <form action="{{ route('dashboard') }}" method="GET" class="flex gap-2">
@@ -561,6 +567,9 @@ const currentCalendarMonth = {{ $date->month }};
 const currentCalendarYear = {{ $date->year }};
 let tempDate = '';
 let tempDateString = '';
+const userRole = "{{ auth()->user()->role }}";
+let canSchedule = userRole === 'teacher' || userRole === 'admin';
+let weekFullDays = new Set();
 let hoverHideTimer = null;
 const hoverCache = new Map();
 let pendingReschedule = null;
@@ -813,16 +822,16 @@ function openPanel(day, dateString) {
     tempDateString = dateString;
 
     // Check role from PHP
-    const userRole = "{{ auth()->user()->role }}";
     const scheduleBtn = document.getElementById('scheduleBtn');
+    canSchedule = userRole === 'teacher' || userRole === 'admin';
 
-    // Show scheduling only for teachers
+    // Show scheduling only for teachers and admins
     if (scheduleBtn) {
-        scheduleBtn.classList.toggle('hidden', userRole !== 'teacher');
+        scheduleBtn.classList.toggle('hidden', !canSchedule);
     }
 
     if (userRole === 'admin') {
-        showRoleFlash('View-only mode: Admins can view assessments but cannot schedule them in calendar.');
+        showRoleFlash('Admin mode: Long Test 2 (Quarterly Exam) scheduling only.');
     }
 
     // Show the Choice Modal
@@ -830,12 +839,28 @@ function openPanel(day, dateString) {
     document.getElementById('choiceModal').classList.remove('hidden');
     document.getElementById('choiceModal').classList.add('flex');
 
+    updateWeekStatusBanner(tempDate);
     updateScheduleAvailability(tempDate);
+}
+
+function updateWeekStatusBanner(isoDate) {
+    const banner = document.getElementById('weekStatusBanner');
+    if (!banner || !isoDate) return;
+    const dayNum = parseInt(isoDate.split('-')[2], 10);
+    if (weekFullDays.has(dayNum)) {
+        banner.classList.remove('hidden');
+    } else {
+        banner.classList.add('hidden');
+    }
 }
 async function handleChoice(action) {
     closeChoiceModal();
     
-    if (action === 'schedule' && userRole === 'teacher') {
+    if (action === 'schedule') {
+        if (!canSchedule) {
+            showRoleFlash('Scheduling is disabled for your role.');
+            return;
+        }
         const allowed = await isScheduleAllowed(tempDate);
         if (!allowed) {
             showRoleFlash('Scheduling is disabled for this date.');
@@ -855,7 +880,12 @@ async function handleChoice(action) {
             clearRescheduleFields();
         }
         checkConflict();
-    } else {
+        return;
+    }
+    if (action !== 'view') {
+        return;
+    }
+    {
         // --- THIS IS THE PART TO FIX ---
         const listContainer = document.getElementById('assessmentList');
         
@@ -907,7 +937,6 @@ function closeChoiceModal() {
 const assignedSubjects = @json(auth()->user()->assigned_subjects ?? []);
 const assignedGrades = @json(auth()->user()->assigned_grades ?? []);
 const subjectCatalog = @json($subjectCatalog ?? []);
-const userRole = "{{ auth()->user()->role }}";
 const hoverCard = document.getElementById('calendarHoverCard');
 const hoverCardDateTitle = document.getElementById('hoverCardDateTitle');
 const hoverCardAssessmentList = document.getElementById('hoverCardAssessmentList');
@@ -966,9 +995,9 @@ function isPastDate(isoDate) {
     return target < today;
 }
 
-async function isDayFullForTeacher(isoDate) {
-    const grades = Array.isArray(assignedGrades) && assignedGrades.length > 0 ? assignedGrades : [];
-    if (grades.length === 0) return false;
+  async function isDayFullForTeacher(isoDate) {
+      const grades = Array.isArray(assignedGrades) && assignedGrades.length > 0 ? assignedGrades : [];
+      if (grades.length === 0) return false;
 
     const checks = await Promise.all(
         grades.map(async (grade) => {
@@ -986,24 +1015,27 @@ async function isDayFullForTeacher(isoDate) {
     return checks.every((isFull) => isFull === true);
 }
 
-async function isScheduleAllowed(isoDate) {
-    if (userRole !== 'teacher') return false;
-    if (isPastDate(isoDate)) return false;
+  async function isScheduleAllowed(isoDate) {
+      if (isPastDate(isoDate)) return false;
 
-    if (pendingReschedule) {
-        try {
-            const response = await fetch(`/api/check-conflict?date=${isoDate}&grade_level=${pendingReschedule.grade_level}&type=${encodeURIComponent(pendingReschedule.type)}`);
-            if (!response.ok) return false;
-            const data = await response.json();
-            return data.status !== 'CRITICAL';
-        } catch {
-            return false;
-        }
-    }
-
-    const full = await isDayFullForTeacher(isoDate);
-    return !full;
-}
+      if (pendingReschedule) {
+          try {
+              const params = new URLSearchParams({
+                  date: isoDate,
+                  grade_level: pendingReschedule.grade_level,
+                  type: pendingReschedule.type,
+                  assessment_id: pendingReschedule.id,
+              });
+              const response = await fetch(`/api/check-conflict?${params.toString()}`);
+              if (!response.ok) return false;
+              const data = await response.json();
+              return data.status !== 'CRITICAL';
+          } catch {
+              return false;
+          }
+      }
+      return true;
+  }
 
 async function updateScheduleAvailability(isoDate) {
     if (!hoverScheduleBtn && !document.getElementById('scheduleBtn')) return;
@@ -1011,9 +1043,7 @@ async function updateScheduleAvailability(isoDate) {
     const scheduleBtn = document.getElementById('scheduleBtn');
     const allowed = await isScheduleAllowed(isoDate);
     const disable = !allowed;
-    const reason = isPastDate(isoDate)
-        ? 'Scheduling disabled for past dates.'
-        : 'Scheduling disabled: day is full for this assessment.';
+      const reason = 'Scheduling disabled for past dates.';
 
     [hoverScheduleBtn, scheduleBtn].forEach((btn) => {
         if (!btn) return;
@@ -1205,12 +1235,16 @@ function setRescheduleMeta() {
     `;
 }
 
-function buildRescheduleCalendar(month, year, notificationData = {}) {
-    if (!rescheduleCalendarGrid) return;
-    rescheduleCalendarGrid.innerHTML = '';
+  function buildRescheduleCalendar(month, year, notificationData = {}) {
+      if (!rescheduleCalendarGrid) return;
+      rescheduleCalendarGrid.innerHTML = '';
 
-    const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    weekdayLabels.forEach((label) => {
+      const data = notificationData.counts ?? notificationData;
+      const weekFullDays = notificationData.week_full_days ?? [];
+      const canHighlightWeeks = userRole === 'teacher' || userRole === 'admin';
+
+      const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      weekdayLabels.forEach((label) => {
         const header = document.createElement('div');
         header.className = 'calendar-header';
         header.textContent = label;
@@ -1229,18 +1263,23 @@ function buildRescheduleCalendar(month, year, notificationData = {}) {
     }
 
     for (let day = 1; day <= totalDays; day++) {
-        const dayCounts = notificationData[String(day)] ?? {};
+        const dayCounts = data[String(day)] ?? {};
         const altCount = Number(dayCounts.alternative ?? 0);
         const formativeCount = Number(dayCounts.formative ?? 0);
-        const longTestCount = Number(dayCounts.long_test ?? 0);
+        const longTest1Count = Number(dayCounts.long_test_1 ?? 0);
+        const longTest2Count = Number(dayCounts.long_test_2 ?? 0);
 
         const dots = [];
         for (let i = 0; i < altCount; i++) dots.push('<span class="calendar-dot dot-alternative"></span>');
         for (let i = 0; i < formativeCount; i++) dots.push('<span class="calendar-dot dot-formative"></span>');
-        for (let i = 0; i < longTestCount; i++) dots.push('<span class="calendar-dot dot-longtest"></span>');
+        for (let i = 0; i < longTest1Count; i++) dots.push('<span class="calendar-dot dot-longtest-1"></span>');
+        for (let i = 0; i < longTest2Count; i++) dots.push('<span class="calendar-dot dot-longtest-2"></span>');
 
         const cell = document.createElement('div');
         cell.className = 'calendar-day reschedule-day';
+        if (canHighlightWeeks && weekFullDays.includes(day)) {
+            cell.classList.add('week-full');
+        }
         cell.dataset.day = day;
         cell.tabIndex = 0;
         cell.setAttribute('role', 'button');
@@ -1718,27 +1757,39 @@ async function refreshCalendarNotifications() {
         if (filters.section) params.set('section', filters.section);
         if (filters.subject) params.set('subject', filters.subject);
 
-        const response = await fetch(`/api/assessment-notifications?${params.toString()}`);
-        const data = await response.json();
+      const response = await fetch(`/api/assessment-notifications?${params.toString()}`);
+      const payload = await response.json();
+      const data = payload.counts ?? payload;
+      const fullDays = payload.week_full_days ?? [];
+      const canHighlightWeeks = userRole === 'teacher' || userRole === 'admin';
+      weekFullDays = new Set(fullDays.map((d) => Number(d)));
 
-        dayElements.forEach((dayEl) => {
-            const day = dayEl.dataset.day;
-            const dayCounts = data[day] ?? {};
-            const altCount = Number(dayCounts.alternative ?? 0);
-            const formativeCount = Number(dayCounts.formative ?? 0);
-            const longTestCount = Number(dayCounts.long_test ?? 0);
-            const dayNumber = dayEl.querySelector('.calendar-day-number')?.textContent || day;
+      dayElements.forEach((dayEl) => {
+          const day = dayEl.dataset.day;
+          const dayCounts = data[day] ?? {};
+          const altCount = Number(dayCounts.alternative ?? 0);
+          const formativeCount = Number(dayCounts.formative ?? 0);
+          const longTest1Count = Number(dayCounts.long_test_1 ?? 0);
+          const longTest2Count = Number(dayCounts.long_test_2 ?? 0);
+          const dayNumber = dayEl.querySelector('.calendar-day-number')?.textContent || day;
 
             const dots = [];
             for (let i = 0; i < altCount; i++) dots.push('<span class="calendar-dot dot-alternative"></span>');
             for (let i = 0; i < formativeCount; i++) dots.push('<span class="calendar-dot dot-formative"></span>');
-            for (let i = 0; i < longTestCount; i++) dots.push('<span class="calendar-dot dot-longtest"></span>');
+            for (let i = 0; i < longTest1Count; i++) dots.push('<span class="calendar-dot dot-longtest-1"></span>');
+            for (let i = 0; i < longTest2Count; i++) dots.push('<span class="calendar-dot dot-longtest-2"></span>');
 
-            dayEl.innerHTML = `
-                <span class="calendar-day-number">${dayNumber}</span>
-                <div class="calendar-day-dots">${dots.join('')}</div>
-            `;
-        });
+          dayEl.innerHTML = `
+              <span class="calendar-day-number">${dayNumber}</span>
+              <div class="calendar-day-dots">${dots.join('')}</div>
+          `;
+          if (canHighlightWeeks && weekFullDays.has(Number(day))) {
+              dayEl.classList.add('week-full');
+          } else {
+              dayEl.classList.remove('week-full');
+          }
+      });
+      updateWeekStatusBanner(tempDate);
     } catch (error) {
         console.error('Failed to refresh notification dots', error);
     }
@@ -2109,13 +2160,22 @@ async function checkConflict() {
     const grade = document.getElementById('gradeSelect').value;
     const date = document.getElementById('hiddenDate').value;
     const type = document.getElementById('assessmentTypeSelect')?.value || '';
+    const rescheduleId = document.getElementById('rescheduleAssessmentId');
     const adviceDiv = document.getElementById('awas-advice');
 
     if (!grade || !date) return;
 
     try {
         // Calling the API route we created in web.php
-        const response = await fetch(`/api/check-conflict?date=${date}&grade_level=${grade}&type=${encodeURIComponent(type)}`);
+        const params = new URLSearchParams({
+            date,
+            grade_level: grade,
+            type,
+        });
+        if (rescheduleId && !rescheduleId.disabled && rescheduleId.value) {
+            params.set('assessment_id', rescheduleId.value);
+        }
+        const response = await fetch(`/api/check-conflict?${params.toString()}`);
         const data = await response.json();
 
         adviceDiv.classList.remove('hidden');
@@ -2651,9 +2711,13 @@ refreshCalendarNotifications();
             <div class="form-group mb-4">
                 <label class="block text-sm font-bold text-gray-700 mb-1">Assessment Type</label>
                 <select name="type" id="assessmentTypeSelect" class="w-full p-2 border rounded border-gray-300" required>
-                    <option value="Formative Assessment">Formative Assessment (FA)</option>
-                    <option value="Alternative Assessment (AA)">Alternative Assessment (AA)</option>
-                    <option value="Long Test">Long Test</option>
+                    @if(auth()->user()->role === 'admin')
+                        <option value="Long Test 2 (Quarterly Exam)">Long Test 2 (Quarterly Exam)</option>
+                    @else
+                        <option value="Formative Assessment">Formative Assessment (FA)</option>
+                        <option value="Alternative Assessment (AA)">Alternative Assessment (AA)</option>
+                        <option value="Long Test 1 (Midterms)">Long Test 1 (Midterms)</option>
+                    @endif
                 </select>
             </div>
 
