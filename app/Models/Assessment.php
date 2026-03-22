@@ -17,6 +17,7 @@ class Assessment extends Model
         'type', 
         'title', 
         'description', 
+        'due_date',
         'scheduled_at',
         'confirmation_status',
         'confirmation_requested_at',
@@ -47,6 +48,7 @@ class Assessment extends Model
     }
 
     protected $casts = [
+        'due_date' => 'datetime',
         'scheduled_at' => 'datetime',
         'confirmation_requested_at' => 'datetime',
         'conducted_at' => 'datetime',

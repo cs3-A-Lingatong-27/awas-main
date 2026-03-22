@@ -186,6 +186,67 @@ select {
     cursor: pointer;
 }
 
+/* Smaller calendar in reschedule modal */
+.reschedule-calendar-grid {
+    gap: 8px;
+}
+
+.reschedule-calendar-grid .calendar-header {
+    padding: 10px 8px;
+    font-size: 11px;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+.reschedule-calendar-grid .calendar-day {
+    min-height: 78px;
+    padding: 10px;
+    border-radius: 10px;
+    border-color: #e2e8f0;
+    background: #ffffff;
+}
+
+.reschedule-calendar-grid .calendar-day-number {
+    font-size: 12px;
+}
+
+.reschedule-calendar-grid .calendar-day.reschedule-day {
+    background: #ffffff;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reschedule-calendar-grid .calendar-day.reschedule-day:hover {
+    background: #eff6ff;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+}
+
+.reschedule-modal-body {
+    overflow-y: auto;
+    max-height: calc(100vh - 8rem);
+}
+
+.reschedule-select {
+    padding-right: 2rem;
+    background-position: right 0.6rem center;
+    background-repeat: no-repeat;
+}
+
+/* Fallback badges for profile panels */
+.badge-blue {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.badge-emerald {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge-amber {
+    background: #fef3c7;
+    color: #92400e;
+}
+
 .calendar-day-dots {
     position: absolute;
     top: 6px;

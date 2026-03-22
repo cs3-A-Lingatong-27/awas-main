@@ -339,6 +339,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return response()->json(['status' => 'ok']);
     })->name('teacher.confirmations.not_conducted');
 
+    Route::post('/api/teacher-confirmations/{assessment}/reschedule', function (Request $request, Assessment $assessment) {
+        $user = auth()->user();
+        if (!$user || $user->role !== 'teacher' || $assessment->user_id !== $user->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'date' => 'required|date',
+        ]);
+
+        $timeSource = $assessment->scheduled_at ?: $assessment->due_date ?: now();
+        $timePart = Carbon::parse($timeSource)->format('H:i:s');
+        $newDateTime = Carbon::parse($validated['date'] . ' ' . $timePart);
+
+        $assessment->scheduled_at = $newDateTime;
+        $assessment->due_date = $newDateTime;
+        $assessment->confirmation_status = 'scheduled';
+        $assessment->confirmation_requested_at = null;
+        $assessment->conducted_at = null;
+        $assessment->save();
+
+        return response()->json(['status' => 'ok', 'message' => 'Assessment rescheduled successfully.']);
+    })->name('teacher.confirmations.reschedule');
+
     Route::get('/api/admin-assessments', function (Request $request) {
         $user = auth()->user();
         if (!$user || $user->role !== 'admin') {
@@ -491,7 +515,8 @@ Route::get('/api/assessments-by-date', function (Request $request) {
             'teacher' => $a->teacher ? $a->teacher->name : null,
             'subject' => $a->subject ? $a->subject->name : $a->type,
             'description' => $a->description,
-            'due_time' => $a->scheduled_at ? Carbon::parse($a->scheduled_at)->format('g:i A') : 'No time set'
+            'due_time' => $a->scheduled_at ? Carbon::parse($a->scheduled_at)->format('g:i A') : 'No time set',
+            'confirmation_status' => $a->confirmation_status,
         ];
     });
 });
@@ -507,7 +532,9 @@ Route::get('/api/assessments-by-date', function (Request $request) {
         $filterSection = $request->query('section');
         $filterSubject = $request->query('subject');
 
-        $query = Assessment::whereMonth('scheduled_at', $month)->whereYear('scheduled_at', $year);
+        $query = Assessment::whereMonth('scheduled_at', $month)
+            ->whereYear('scheduled_at', $year)
+            ->whereNotNull('scheduled_at');
         
         if ($user && $user->role === 'student') {
             $query->where('grade_level', $user->grade_level);

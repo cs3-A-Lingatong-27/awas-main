@@ -191,6 +191,48 @@
 </div>
 @endif
 
+@if(auth()->user()->role === 'teacher')
+<div id="teacherRescheduleModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" style="z-index: 2147483647;">
+    <div class="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200" style="max-height: calc(100vh - 2rem);">
+        <div class="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900">Reschedule Assessment</h3>
+                <p class="text-sm text-slate-500">Pick a new day for this assessment.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" id="cancelTeacherRescheduleBtn" class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+                <button type="button" id="closeTeacherRescheduleBtn" class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100">Close</button>
+            </div>
+        </div>
+        <div class="px-6 py-4 reschedule-modal-body">
+            <div id="rescheduleAssessmentMeta" class="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                Select a date to continue.
+            </div>
+            <div class="flex flex-wrap items-end gap-3 mb-4">
+                <div class="min-w-[160px]">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+                    <select id="rescheduleMonthSelect" class="w-full border border-slate-200 bg-white p-2 rounded-lg text-sm reschedule-select">
+                        @foreach(range(1, 12) as $m)
+                            <option value="{{ $m }}">{{ date('F', mktime(0, 0, 0, $m, 1)) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="min-w-[120px]">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Year</label>
+                    <select id="rescheduleYearSelect" class="w-full border border-slate-200 bg-white p-2 rounded-lg text-sm reschedule-select">
+                        @for($y = 2024; $y <= 2030; $y++)
+                            <option value="{{ $y }}">{{ $y }}</option>
+                        @endfor
+                    </select>
+                </div>
+                <div class="text-xs text-slate-500 pb-2">Click a date to reschedule.</div>
+            </div>
+            <div id="rescheduleCalendarGrid" class="calendar-grid reschedule-calendar-grid"></div>
+        </div>
+    </div>
+</div>
+@endif
+
 
     <div class="app auth-card overflow-hidden">
 <header class="topbar flex items-center justify-between px-8 py-4 bg-slate-900 text-white shadow-lg">
@@ -237,7 +279,6 @@
         
         <section id="calendar-tab" class="content-tab" style="display: block;">
             <section class="calendar-section">
-                <div class="calendar-title">{{ $date->format('F Y') }}</div>
                 <div class="calendar-legend">
                     <span class="legend-item"><span class="calendar-dot dot-alternative"></span> Alternative Assessment</span>
                     <span class="legend-item"><span class="calendar-dot dot-formative"></span> Formative Assessment</span>
@@ -364,7 +405,15 @@
 
 <div id="scholarPanel" class="side-panel">
     <div class="panel-header">
-        <h3>Scholar Details</h3>
+        <h3>
+            @if(auth()->user()->role === 'admin')
+                Admin Details
+            @elseif(auth()->user()->role === 'teacher')
+                Teacher Details
+            @else
+                Scholar Details
+            @endif
+        </h3>
         <button onclick="closeAllPanels()" class="close-btn">&times;</button>
     </div>
     <div class="panel-body">
@@ -421,7 +470,7 @@
                         <label>Handled Grade Levels</label>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @forelse($teacherGrades as $grade)
-                                <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">Grade {{ $grade }}</span>
+                                <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800 badge-blue">Grade {{ $grade }}</span>
                             @empty
                                 <span class="text-sm text-gray-500 italic">No assigned grade levels.</span>
                             @endforelse
@@ -432,7 +481,7 @@
                         <label>Handled Sections</label>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @forelse($teacherSections as $section)
-                                <span class="px-2 py-1 text-xs font-semibold rounded bg-emerald-100 text-emerald-800">{{ $section }}</span>
+                                <span class="px-2 py-1 text-xs font-semibold rounded bg-emerald-100 text-emerald-800 badge-emerald">{{ $section }}</span>
                             @empty
                                 <span class="text-sm text-gray-500 italic">No assigned sections.</span>
                             @endforelse
@@ -443,7 +492,7 @@
                         <label>Assigned Subjects</label>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @forelse($teacherSubjects as $subject)
-                                <span class="px-2 py-1 text-xs font-semibold rounded bg-amber-100 text-amber-800">{{ $subject }}</span>
+                                <span class="px-2 py-1 text-xs font-semibold rounded bg-amber-100 text-amber-800 badge-amber">{{ $subject }}</span>
                             @empty
                                 <span class="text-sm text-gray-500 italic">No assigned subjects.</span>
                             @endforelse
@@ -830,14 +879,15 @@ async function handleChoice(action) {
                     </div>`;
             } else {
                 listContainer.innerHTML = assessments.map(a => `
-<div id="assessment-item-${a.id}" class="p-3 bg-white border-l-4 border-blue-600 rounded shadow-sm mb-2">
+<div id="assessment-item-${a.id}" class="p-3 bg-white border-l-4 ${a.confirmation_status === 'conducted' ? 'border-emerald-500' : 'border-blue-600'} rounded shadow-sm mb-2">
     <div class="flex justify-between items-start">
         <div>
             <span class="text-[10px] uppercase tracking-wider font-bold text-blue-600">${a.subject}</span>
-            <div class="font-bold text-gray-800">${a.title}</div>
+            <div class="font-bold ${a.confirmation_status === 'conducted' ? 'text-emerald-700 line-through' : 'text-gray-800'}">${a.title}</div>
             <div class="text-xs text-gray-500">${a.description || ''}</div>
             <div class="text-xs text-gray-400 mt-1">${a.teacher ? `By ${a.teacher}` : ''}</div>
         </div>
+        ${a.confirmation_status === 'conducted' ? '<span class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-1">Completed</span>' : ''}
     </div>
     <div class="text-xs text-gray-400 mt-2 font-mono">🕒 Deadline: ${a.due_time}</div>
 </div>
@@ -889,6 +939,13 @@ const teacherCalendarSubjectFilter = document.getElementById('teacherCalendarSub
     const closeTeacherConfirmationsBtn = document.getElementById('closeTeacherConfirmationsBtn');
     const teacherConfirmationsBody = document.getElementById('teacherConfirmationsBody');
     const teacherConfirmationsStatus = document.getElementById('teacherConfirmationsStatus');
+    const teacherRescheduleModal = document.getElementById('teacherRescheduleModal');
+    const closeTeacherRescheduleBtn = document.getElementById('closeTeacherRescheduleBtn');
+    const cancelTeacherRescheduleBtn = document.getElementById('cancelTeacherRescheduleBtn');
+    const rescheduleMonthSelect = document.getElementById('rescheduleMonthSelect');
+    const rescheduleYearSelect = document.getElementById('rescheduleYearSelect');
+    const rescheduleCalendarGrid = document.getElementById('rescheduleCalendarGrid');
+    const rescheduleAssessmentMeta = document.getElementById('rescheduleAssessmentMeta');
 
 function getCsrfToken() {
     const tokenMeta = document.querySelector('meta[name="csrf-token"]');
@@ -1104,6 +1161,173 @@ function closeTeacherConfirmationsModal() {
     document.body.classList.remove('overflow-hidden');
 }
 
+function openTeacherRescheduleModal() {
+    if (!teacherRescheduleModal) return;
+    if (rescheduleMonthSelect && rescheduleYearSelect) {
+        const now = new Date();
+        rescheduleMonthSelect.value = String(now.getMonth() + 1);
+        rescheduleYearSelect.value = String(now.getFullYear());
+    }
+    setRescheduleMeta();
+    renderRescheduleCalendar();
+    teacherRescheduleModal.classList.remove('hidden');
+    teacherRescheduleModal.classList.add('flex');
+    teacherRescheduleModal.style.display = 'flex';
+    document.body.classList.add('overflow-hidden');
+}
+
+function closeTeacherRescheduleModal() {
+    if (!teacherRescheduleModal) return;
+    teacherRescheduleModal.classList.add('hidden');
+    teacherRescheduleModal.classList.remove('flex');
+    teacherRescheduleModal.style.display = 'none';
+    document.body.classList.remove('overflow-hidden');
+}
+
+function setRescheduleMeta() {
+    if (!rescheduleAssessmentMeta) return;
+    if (!pendingReschedule) {
+        rescheduleAssessmentMeta.textContent = 'Select a date to continue.';
+        return;
+    }
+    const sectionText = pendingReschedule.section ? `Section: ${pendingReschedule.section}` : 'Section: All Sections';
+    rescheduleAssessmentMeta.innerHTML = `
+        <div class="p-3 bg-white border-l-4 border-blue-600 rounded shadow-sm">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-[10px] uppercase tracking-wider font-bold text-blue-600">${pendingReschedule.subject || 'Assessment'}</span>
+                    <div class="font-bold text-gray-800">${pendingReschedule.title || 'Assessment'}</div>
+                    <div class="text-xs text-gray-500">${pendingReschedule.type || ''} • Grade ${pendingReschedule.grade_level || '-'}</div>
+                    <div class="text-xs text-gray-400 mt-1">${sectionText}</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function buildRescheduleCalendar(month, year, notificationData = {}) {
+    if (!rescheduleCalendarGrid) return;
+    rescheduleCalendarGrid.innerHTML = '';
+
+    const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    weekdayLabels.forEach((label) => {
+        const header = document.createElement('div');
+        header.className = 'calendar-header';
+        header.textContent = label;
+        rescheduleCalendarGrid.appendChild(header);
+    });
+
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    const startWeekday = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+
+    for (let i = 0; i < startWeekday; i++) {
+        const spacer = document.createElement('div');
+        spacer.className = 'calendar-day empty';
+        rescheduleCalendarGrid.appendChild(spacer);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+        const dayCounts = notificationData[String(day)] ?? {};
+        const altCount = Number(dayCounts.alternative ?? 0);
+        const formativeCount = Number(dayCounts.formative ?? 0);
+        const longTestCount = Number(dayCounts.long_test ?? 0);
+
+        const dots = [];
+        for (let i = 0; i < altCount; i++) dots.push('<span class="calendar-dot dot-alternative"></span>');
+        for (let i = 0; i < formativeCount; i++) dots.push('<span class="calendar-dot dot-formative"></span>');
+        for (let i = 0; i < longTestCount; i++) dots.push('<span class="calendar-dot dot-longtest"></span>');
+
+        const cell = document.createElement('div');
+        cell.className = 'calendar-day reschedule-day';
+        cell.dataset.day = day;
+        cell.tabIndex = 0;
+        cell.setAttribute('role', 'button');
+        cell.setAttribute('aria-label', `Reschedule to ${month}/${day}/${year}`);
+        cell.addEventListener('click', () => handleReschedulePick(year, month, day));
+        cell.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleReschedulePick(year, month, day);
+            }
+        });
+
+        const dayLabel = document.createElement('span');
+        dayLabel.className = 'calendar-day-number';
+        dayLabel.textContent = day;
+        cell.appendChild(dayLabel);
+        if (dots.length > 0) {
+            const dotsWrap = document.createElement('div');
+            dotsWrap.className = 'calendar-day-dots';
+            dotsWrap.innerHTML = dots.join('');
+            cell.appendChild(dotsWrap);
+        }
+        rescheduleCalendarGrid.appendChild(cell);
+    }
+}
+
+async function renderRescheduleCalendar() {
+    if (!rescheduleMonthSelect || !rescheduleYearSelect) return;
+    const month = parseInt(rescheduleMonthSelect.value, 10);
+    const year = parseInt(rescheduleYearSelect.value, 10);
+    if (!month || !year) return;
+
+    try {
+        const params = new URLSearchParams({
+            month: String(month).padStart(2, '0'),
+            year: String(year),
+        });
+        if (pendingReschedule?.grade_level) {
+            params.set('grade_level', String(pendingReschedule.grade_level));
+        }
+        if (pendingReschedule?.section && !pendingReschedule.section.includes(',')) {
+            params.set('section', pendingReschedule.section);
+        }
+        const response = await fetch(`/api/assessment-notifications?${params.toString()}`);
+        const data = await response.json();
+        buildRescheduleCalendar(month, year, data);
+    } catch (error) {
+        console.error('Failed to load reschedule notification dots', error);
+        buildRescheduleCalendar(month, year, {});
+    }
+}
+
+async function handleReschedulePick(year, month, day) {
+    if (!pendingReschedule || !pendingReschedule.id) return;
+    const yyyy = String(year);
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    const date = `${yyyy}-${mm}-${dd}`;
+
+    try {
+        const token = getCsrfToken();
+        const response = await fetch(`/api/teacher-confirmations/${pendingReschedule.id}/reschedule`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token
+            },
+            body: JSON.stringify({ date })
+        });
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+        closeTeacherRescheduleModal();
+        pendingReschedule = null;
+        if (data?.message) {
+            showRoleFlash(data.message);
+        } else {
+            showRoleFlash('Assessment rescheduled successfully.');
+        }
+        refreshCalendarNotifications();
+        loadTeacherConfirmations();
+    } catch (error) {
+        showRoleFlash(error?.message || 'Failed to reschedule assessment.', '#dc2626');
+    }
+}
+
 function renderTeacherConfirmations(data) {
     if (!teacherConfirmationsBody || !teacherConfirmationsStatus) return;
     if (!Array.isArray(data) || data.length === 0) {
@@ -1127,10 +1351,10 @@ function renderTeacherConfirmations(data) {
             <td class="px-4 py-3 text-slate-600">${assessment.grade_level ?? '-'}</td>
             <td class="px-4 py-3 text-slate-600">${assessment.subject ?? '-'}</td>
             <td class="px-4 py-3 text-slate-500 text-xs">${assessment.scheduled_at ?? '-'}</td>
-            <td class="px-4 py-3">
-                <div class="flex flex-wrap gap-2">
+            <td class="px-4 py-3 min-w-[140px]">
+                <div class="flex flex-col gap-2">
                     <button type="button" data-action="conducted" class="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Conducted</button>
-                    <button type="button" data-action="not-conducted" class="rounded bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600">Not Conducted</button>
+                    <button type="button" data-action="not-conducted" class="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700">Not Conducted</button>
                 </div>
             </td>
         </tr>
@@ -1427,9 +1651,10 @@ function renderHoverAssessments(assessments) {
     hoverCardAssessmentList.innerHTML = previewItems.map((a) => `
         <div class="mb-2 rounded border border-gray-100 p-2">
             <div class="text-[11px] uppercase tracking-wide font-bold text-blue-600">${a.subject}</div>
-            <div class="font-semibold text-gray-800">${a.title}</div>
+            <div class="font-semibold ${a.confirmation_status === 'conducted' ? 'text-emerald-700 line-through' : 'text-gray-800'}">${a.title}</div>
             <div class="text-xs text-gray-500">${a.due_time}</div>
             <div class="text-[11px] text-gray-400">${a.teacher ? `By ${a.teacher}` : ''}</div>
+            ${a.confirmation_status === 'conducted' ? '<div class="mt-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Completed</div>' : ''}
         </div>
     `).join('');
 }
@@ -2099,10 +2324,38 @@ if (userRole === 'teacher') {
         });
     }
 
+    if (closeTeacherRescheduleBtn && teacherRescheduleModal) {
+        closeTeacherRescheduleBtn.addEventListener('click', () => {
+            closeTeacherRescheduleModal();
+        });
+    }
+    if (cancelTeacherRescheduleBtn && teacherRescheduleModal) {
+        cancelTeacherRescheduleBtn.addEventListener('click', () => {
+            closeTeacherRescheduleModal();
+            openTeacherConfirmationsModal();
+        });
+    }
+
+    if (rescheduleMonthSelect) {
+        rescheduleMonthSelect.addEventListener('change', renderRescheduleCalendar);
+    }
+
+    if (rescheduleYearSelect) {
+        rescheduleYearSelect.addEventListener('change', renderRescheduleCalendar);
+    }
+
     if (teacherConfirmationsModal) {
         teacherConfirmationsModal.addEventListener('click', (event) => {
             if (event.target === teacherConfirmationsModal) {
                 closeTeacherConfirmationsModal();
+            }
+        });
+    }
+
+    if (teacherRescheduleModal) {
+        teacherRescheduleModal.addEventListener('click', (event) => {
+            if (event.target === teacherRescheduleModal) {
+                closeTeacherRescheduleModal();
             }
         });
     }
@@ -2119,7 +2372,6 @@ if (userRole === 'teacher') {
             btn.disabled = true;
             btn.classList.add('opacity-60');
             try {
-                await postTeacherConfirmationAction(id, action);
                 if (action === 'not-conducted') {
                     let info = {};
                     if (row.dataset.info) {
@@ -2138,9 +2390,10 @@ if (userRole === 'teacher') {
                         section: info.section || ''
                     };
                     closeTeacherConfirmationsModal();
-                    showRoleFlash('Choose a new day on the calendar to reschedule this assessment.');
-                    document.getElementById('calendar-tab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    openTeacherRescheduleModal();
                 } else {
+                    await postTeacherConfirmationAction(id, action);
+                    hoverCache.clear();
                     const rows = await loadTeacherConfirmations();
                     if (rows.length === 0) {
                         closeTeacherConfirmationsModal();

@@ -166,13 +166,16 @@ public function index()
             'due_time' => 'required',
             'grade_level' => 'required|integer',
             'subject' => 'required|string',
-            'section' => 'nullable|string|max:100',
+            'section' => 'nullable|string|max:255',
         ]);
 
         $date = $request->due_date;
         $type = $request->type === 'Alternative Assessment' ? 'Alternative Assessment (AA)' : $request->type;
         $grade = (int) $request->grade_level;
-        $section = $request->filled('section') ? trim((string) $request->section) : null;
+        $sectionInput = $request->filled('section') ? trim((string) $request->section) : null;
+        $sectionList = $sectionInput
+            ? array_values(array_filter(array_map('trim', explode(',', $sectionInput))))
+            : [];
         $subjectName = $request->subject;
 
         $rescheduleId = $request->input('reschedule_assessment_id');
@@ -183,7 +186,10 @@ public function index()
                 ->firstOrFail();
             $type = $rescheduleAssessment->type;
             $grade = (int) $rescheduleAssessment->grade_level;
-            $section = $rescheduleAssessment->section;
+            $sectionInput = $rescheduleAssessment->section;
+            $sectionList = $sectionInput
+                ? array_values(array_filter(array_map('trim', explode(',', (string) $sectionInput))))
+                : [];
             $subjectName = $rescheduleAssessment->subject ? $rescheduleAssessment->subject->name : $subjectName;
         }
 
@@ -212,15 +218,33 @@ public function index()
         $sectionExempt = $isScienceCoreExempt || $isElectiveExempt;
 
         if ($sectionExempt) {
-            $section = null;
+            $sectionInput = null;
+            $sectionList = [];
         } else {
-            if (!$section) {
+            if (empty($sectionList)) {
                 return back()->with('error', "Please select a section for this subject.");
             }
-            if (isset($gradeSectionMap[$requestedGrade]) && !in_array($section, $gradeSectionMap[$requestedGrade], true)) {
-                return back()->with('error', "Invalid section for Grade {$requestedGrade}.");
+            if (isset($gradeSectionMap[$requestedGrade])) {
+                $invalidSections = array_diff($sectionList, $gradeSectionMap[$requestedGrade]);
+                if (!empty($invalidSections)) {
+                    return back()->with('error', "Invalid section for Grade {$requestedGrade}.");
+                }
             }
+
+            if ($user->role === 'teacher') {
+                $teacherSections = is_array($user->section)
+                    ? $user->section
+                    : array_values(array_filter(array_map('trim', explode(',', (string) $user->section))));
+                if (!empty($teacherSections)) {
+                    $invalidTeacherSections = array_diff($sectionList, $teacherSections);
+                    if (!empty($invalidTeacherSections)) {
+                        return back()->with('error', "Unauthorized: One or more sections are not assigned to you.");
+                    }
+                }
+            }
+
         }
+        $section = $sectionInput ? implode(', ', $sectionList) : null;
 
         // 3. THE AWAS ALGORITHM (Conflict Detection)
         if ($type === 'Formative Assessment') {
@@ -252,6 +276,7 @@ public function index()
 
         if ($rescheduleAssessment) {
             $rescheduleAssessment->scheduled_at = $date . ' ' . $request->due_time;
+            $rescheduleAssessment->due_date = $date . ' ' . $request->due_time;
             $rescheduleAssessment->confirmation_status = 'scheduled';
             $rescheduleAssessment->confirmation_requested_at = null;
             $rescheduleAssessment->conducted_at = null;
@@ -265,6 +290,7 @@ public function index()
             'title'        => $request->title,
             'type'         => $type,
             'scheduled_at' => $date . ' ' . $request->due_time,
+            'due_date'     => $date . ' ' . $request->due_time,
             'grade_level'  => $grade,
             'section'      => $section,
             'subject_id'   => null, 

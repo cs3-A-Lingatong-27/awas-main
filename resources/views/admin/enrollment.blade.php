@@ -237,7 +237,15 @@
 
 <div id="scholarPanel" class="side-panel">
     <div class="panel-header">
-        <h3>Scholar Details</h3>
+        <h3>
+            @if(auth()->user()->role === 'admin')
+                Admin Details
+            @elseif(auth()->user()->role === 'teacher')
+                Teacher Details
+            @else
+                Scholar Details
+            @endif
+        </h3>
         <button onclick="closeAllPanels()" class="close-btn">&times;</button>
     </div>
     <div class="panel-body">
@@ -272,7 +280,7 @@
                     <label>Assigned Grades</label>
                     <div class="stat-grid">
                         @forelse($teacherGrades as $grade)
-                            <div class="stat-item"><span>Grade</span><strong class="text-blue-700">{{ $grade }}</strong></div>
+                            <div class="stat-item"><span>Grade</span><strong class="text-blue-700 badge-blue">{{ $grade }}</strong></div>
                         @empty
                             <div class="stat-item"><span>No assigned grades.</span></div>
                         @endforelse
@@ -282,7 +290,7 @@
                     <label>Assigned Sections</label>
                     <ul class="grade-list">
                         @forelse($teacherSections as $section)
-                            <li><span class="grade">{{ $section }}</span></li>
+                            <li><span class="px-2 py-1 text-xs font-semibold rounded bg-emerald-100 text-emerald-800 badge-emerald">{{ $section }}</span></li>
                         @empty
                             <li><span class="text-muted">No assigned sections.</span></li>
                         @endforelse
@@ -292,7 +300,7 @@
                     <label>Assigned Subjects</label>
                     <div class="flex flex-wrap gap-2">
                         @forelse($teacherSubjects as $subject)
-                            <span class="px-2 py-1 text-xs font-semibold rounded bg-amber-100 text-amber-800">{{ $subject }}</span>
+                            <span class="px-2 py-1 text-xs font-semibold rounded bg-amber-100 text-amber-800 badge-amber">{{ $subject }}</span>
                         @empty
                             <span class="text-sm text-gray-500 italic">No assigned subjects.</span>
                         @endforelse
