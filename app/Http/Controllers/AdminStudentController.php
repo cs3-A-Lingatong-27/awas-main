@@ -9,17 +9,26 @@ use Illuminate\Support\Facades\Hash;
 
 class AdminStudentController extends Controller
 {
+    /**
+     * List all student accounts for admin management.
+     */
     public function index()
     {
         $students = User::where('role', 'student')->get();
         return view('admin.students.index', compact('students'));
     }
 
+    /**
+     * Show the form for creating a student.
+     */
     public function create()
     {
         return view('admin.students.create');
     }
 
+    /**
+     * Validate input, create a student, and assign their section.
+     */
     public function store(Request $request)
     {
         $gradeSectionMap = [

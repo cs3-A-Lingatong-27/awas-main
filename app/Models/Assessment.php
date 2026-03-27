@@ -37,11 +37,17 @@ class Assessment extends Model
             ->count();
     }
 
+    /**
+     * Relationship: assessment belongs to a subject.
+     */
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
     }
 
+    /**
+     * Relationship: assessment belongs to a room.
+     */
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
@@ -54,7 +60,9 @@ class Assessment extends Model
         'conducted_at' => 'datetime',
     ];
 
-    // Link to the Teacher/User who created the assessment
+    /**
+     * Relationship: assessment belongs to the teacher (user) who created it.
+     */
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');

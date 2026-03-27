@@ -144,6 +144,9 @@ class SendWeeklyTeacherSummaries extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * Extract a subject label from an assessment description string.
+     */
     private function extractSubject(string $description): string
     {
         if (preg_match('/Subject:\s*([^|]+)/i', $description, $matches) === 1) {
@@ -153,6 +156,9 @@ class SendWeeklyTeacherSummaries extends Command
         return 'Unspecified Subject';
     }
 
+    /**
+     * Extract a section label from an assessment description string.
+     */
     private function extractSection(string $description): ?string
     {
         if (preg_match('/Section:\s*([^|]+)/i', $description, $matches) === 1) {
@@ -162,6 +168,9 @@ class SendWeeklyTeacherSummaries extends Command
         return null;
     }
 
+    /**
+     * Parse a comma-separated section string into a clean array.
+     */
     private function parseAssignedSections(string $raw): array
     {
         return collect(explode(',', $raw))
@@ -171,6 +180,9 @@ class SendWeeklyTeacherSummaries extends Command
             ->all();
     }
 
+    /**
+     * Build a list of grade/section labels the teacher is responsible for.
+     */
     private function buildHandledClasses(array $assignedGrades, array $assignedSections): array
     {
         $gradeSectionMap = [

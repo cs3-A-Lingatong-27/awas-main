@@ -7,9 +7,12 @@ use Illuminate\Console\Command;
 
 class CloseAssessmentConfirmations extends Command
 {
-    protected $signature = 'app:close-assessment-confirmations';
+        protected $signature = 'app:close-assessment-confirmations';
     protected $description = 'Auto-mark pending assessments as conducted at end of day';
 
+    /**
+     * Mark pending confirmations as conducted at end-of-day.
+     */
     public function handle(): int
     {
         $now = now();

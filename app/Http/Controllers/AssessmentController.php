@@ -10,11 +10,11 @@ use Carbon\Carbon;
 class AssessmentController extends Controller
 {
     /**
-     * Display assessments filtered by the teacher's assigned grade.
+     * Display assessments filtered by the current user's role and grade scope.
      */
-public function index()
-{
-    $user = auth()->user();
+    public function index()
+    {
+        $user = auth()->user();
 
     if ($user->role === 'teacher') {
         // Teachers see only the grades they are assigned to
@@ -38,20 +38,26 @@ public function index()
             ->get();
     }
 
-    return view('dashboard', compact('assessments'));
-}
-
-    public function destroy(Assessment $assessment)
-{
-    // Check if the logged-in user is an admin OR the owner of the assessment
-    if (auth()->user()->role === 'admin' || $assessment->user_id === auth()->id()) {
-        $assessment->delete();
-        return response()->json(['success' => true]);
+        return view('dashboard', compact('assessments'));
     }
 
-    return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-}
+    /**
+     * Delete an assessment if the user is authorized to do so.
+     */
+    public function destroy(Assessment $assessment)
+    {
+        // Check if the logged-in user is an admin OR the owner of the assessment
+        if (auth()->user()->role === 'admin' || $assessment->user_id === auth()->id()) {
+            $assessment->delete();
+            return response()->json(['success' => true]);
+        }
 
+        return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+    }
+
+    /**
+     * Validate and create (or reschedule) an assessment with policy checks.
+     */
     public function store(Request $request)
     {
         $user = auth()->user();

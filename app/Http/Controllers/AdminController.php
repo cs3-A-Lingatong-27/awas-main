@@ -9,21 +9,28 @@ use App\Models\User;
 
 class AdminController extends Controller
 {
-    // List all students
+    /**
+     * List all student accounts for the admin view.
+     */
     public function students()
     {
         $students = User::where('role', 'student')->get();
         return view('admin.students.index', compact('students'));
     }
 
-    // Show create student form
+    /**
+     * Show the admin form for creating a student.
+     */
     public function createStudent()
     {
         return view('admin.students.create');
     }
 
-public function storeStudent(Request $request)
-{
+    /**
+     * Validate and store a new student, then assign subjects and section.
+     */
+    public function storeStudent(Request $request)
+    {
     $gradeSectionMap = [
         7 => ['Opal', 'Turquoise', 'Aquamarine', 'Sapphire'],
         8 => ['Anthurium', 'Carnation', 'Daffodil', 'Sunflower'],
@@ -178,11 +185,14 @@ public function storeStudent(Request $request)
     }
 
     // 3. Redirect back to dashboard (since that's where your form is)
-    return redirect()->route('dashboard')->with('success', 'Student enrolled successfully!');
-}
+        return redirect()->route('dashboard')->with('success', 'Student enrolled successfully!');
+    }
 
-public function storeTeacher(Request $request)
-{
+    /**
+     * Validate and store a new teacher with assigned grades, subjects, and sections.
+     */
+    public function storeTeacher(Request $request)
+    {
     $gradeSubjectMap = [
         7 => [
             'Integrated Science 1',
@@ -321,6 +331,6 @@ public function storeTeacher(Request $request)
         'section' => !empty($assignedSections) ? implode(', ', $assignedSections) : null,
     ]);
 
-    return redirect()->route('dashboard')->with('success', 'Teacher registered successfully!');
-}
+        return redirect()->route('dashboard')->with('success', 'Teacher registered successfully!');
+    }
 }

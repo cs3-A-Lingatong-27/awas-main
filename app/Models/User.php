@@ -19,16 +19,16 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-protected $fillable = [
-    'name',
-    'email',
-    'password',
-    'role',         // Add this
-    'grade_level',  // Add this
-    'section',      // Add this
-    'assigned_grades',
-    'assigned_subjects',
-];
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'role',         // Add this
+        'grade_level',  // Add this
+        'section',      // Add this
+        'assigned_grades',
+        'assigned_subjects',
+    ];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -56,7 +56,7 @@ protected $fillable = [
     }
 
     /**
-     * Get the user's initials
+     * Build a two-letter initials string from the user's name.
      */
     public function initials(): string
     {
@@ -67,11 +67,17 @@ protected $fillable = [
             ->implode('');
     }
 
+    /**
+     * Relationship: student has one grade/section assignment record.
+     */
     public function studentGradeSection()
     {
         return $this->hasOne(StudentGradeSection::class);
     }
 
+    /**
+     * Relationship: student has many subject assignments.
+     */
     public function studentSubjects()
     {
         return $this->hasMany(StudentSubject::class);

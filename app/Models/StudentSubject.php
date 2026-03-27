@@ -13,9 +13,11 @@ class StudentSubject extends Model
         'subject_type',
     ];
 
+    /**
+     * Relationship: student subject record belongs to a user.
+     */
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 }
-

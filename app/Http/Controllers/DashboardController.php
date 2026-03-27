@@ -9,8 +9,11 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-   public function index(Request $request)
-{
+    /**
+     * Render the dashboard with calendar counts and subject catalog.
+     */
+    public function index(Request $request)
+    {
     $user = auth()->user();
     $month = $request->get('month', date('m'));
     $year = $request->get('year', date('Y'));
@@ -40,14 +43,14 @@ $notifications = $query->get()
     })
     ->map->count();
 
-    return view('dashboard', [
-        'user' => $user, 
-        'date' => $date,
-        'notifications' => $notifications,
-        'daysInMonth' => $date->daysInMonth,
-        'firstDayOfMonth' => $date->dayOfWeek,
-        'assignedGrades' => $assignedGrades,
-        'subjectCatalog' => Subject::select('name', 'type', 'grade_level_start', 'grade_level_end')->get(),
-    ]);
-}
+        return view('dashboard', [
+            'user' => $user, 
+            'date' => $date,
+            'notifications' => $notifications,
+            'daysInMonth' => $date->daysInMonth,
+            'firstDayOfMonth' => $date->dayOfWeek,
+            'assignedGrades' => $assignedGrades,
+            'subjectCatalog' => Subject::select('name', 'type', 'grade_level_start', 'grade_level_end')->get(),
+        ]);
+    }
 }

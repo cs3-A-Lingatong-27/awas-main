@@ -10,14 +10,15 @@ use Illuminate\Support\Facades\DB;
 class RoleSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Seed the roles lookup table with default role names.
      */
-public function run() {
-    DB::table('roles')->insert([
-        ['name' => 'admin'],
-        ['name' => 'teacher'],
-        ['name' => 'student'],
-    ]);
-}
+    public function run()
+    {
+        DB::table('roles')->insert([
+            ['name' => 'admin'],
+            ['name' => 'teacher'],
+            ['name' => 'student'],
+        ]);
+    }
 
 }

@@ -12,7 +12,7 @@ use Illuminate\View\View;
 class AuthenticatedSessionController extends Controller
 {
     /**
-     * Display the login view.
+     * Show the login form view.
      */
     public function create(): View
     {
@@ -20,30 +20,30 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
-     * Handle an incoming authentication request.
+     * Authenticate the user and redirect based on role.
      */
-public function store(LoginRequest $request): RedirectResponse
-{
-    $request->authenticate();
+    public function store(LoginRequest $request): RedirectResponse
+    {
+        $request->authenticate();
 
-    $request->session()->regenerate();
+        $request->session()->regenerate();
 
-    $role = auth()->user()->role;
+        $role = auth()->user()->role;
 
-    if ($role === 'admin') {
-        return redirect()->route('dashboard');
-    } elseif ($role === 'teacher') {
-        return redirect()->route('dashboard');
-    } else {
-        return redirect()->route('dashboard');
+        if ($role === 'admin') {
+            return redirect()->route('dashboard');
+        } elseif ($role === 'teacher') {
+            return redirect()->route('dashboard');
+        } else {
+            return redirect()->route('dashboard');
+        }
+
+        return redirect()->intended(route('dashboard', absolute: false));
     }
-
-    return redirect()->intended(route('dashboard', absolute: false));
-}
 
 
     /**
-     * Destroy an authenticated session.
+     * Log out the user and invalidate the session.
      */
     public function destroy(Request $request): RedirectResponse
     {

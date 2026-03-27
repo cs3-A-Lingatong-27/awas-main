@@ -13,6 +13,9 @@ class SendAssessmentConfirmationReminders extends Command
     protected $signature = 'app:send-assessment-confirmation-reminders';
     protected $description = 'Mark overdue assessments as pending and email teachers to confirm';
 
+    /**
+     * Update overdue assessments and send reminder emails to teachers.
+     */
     public function handle(): int
     {
         $now = now();

@@ -17,5 +17,6 @@ Schedule::command('app:close-assessment-confirmations')
     ->timezone(config('app.timezone'));
 
 Artisan::command('inspire', function () {
+    // Output a random inspirational quote to the console.
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

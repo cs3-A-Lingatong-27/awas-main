@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Mail;
  * PUBLIC ROUTES
  */
 Route::get('/', function () {
+    // Render the public landing page.
     return view('welcome');
 })->name('home'); // CRITICAL FIX: Tests and some components look for the 'home' route.
 
@@ -30,6 +31,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Admin Enrollment Page
     Route::get('/admin/enrollment', function () {
+        // Show the admin enrollment dashboard view.
         if (auth()->user()->role !== 'admin') {
             abort(403);
         }
@@ -41,6 +43,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('admin.enrollment');
 
     Route::get('/admin/enrollment/students', function (Request $request) {
+        // Return filtered student enrollment data for the admin UI.
         if (auth()->user()->role !== 'admin') {
             abort(403);
         }
@@ -110,6 +113,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('admin.enrollment.students');
 
     Route::get('/admin/enrollment/teachers', function (Request $request) {
+        // Return filtered teacher enrollment data for the admin UI.
         if (auth()->user()->role !== 'admin') {
             abort(403);
         }
@@ -169,6 +173,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('admin.enrollment.teachers');
 
     Route::get('/admin/enrollment/teachers/subjects', function (Request $request) {
+        // Return available subjects for teachers filtered by grade.
         if (auth()->user()->role !== 'admin') {
             abort(403);
         }
@@ -223,6 +228,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/assessments/{assessment}', [AssessmentController::class, 'destroy'])->name('assessments.destroy');
 
     Route::get('/api/teacher-assessments', function (Request $request) {
+        // Return a teacher's assessments for dashboard widgets.
         $user = auth()->user();
         if (!$user || $user->role !== 'teacher') {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -258,6 +264,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('teacher.assessments');
 
     Route::get('/api/teacher-confirmations', function () {
+        // Return confirmation items for a teacher and update pending status.
         $user = auth()->user();
         if (!$user || $user->role !== 'teacher') {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -315,6 +322,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('teacher.confirmations');
 
     Route::post('/api/teacher-confirmations/{assessment}/conducted', function (Assessment $assessment) {
+        // Mark a teacher assessment as conducted.
         $user = auth()->user();
         if (!$user || $user->role !== 'teacher' || $assessment->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -328,6 +336,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('teacher.confirmations.conducted');
 
     Route::post('/api/teacher-confirmations/{assessment}/not-conducted', function (Assessment $assessment) {
+        // Mark a teacher assessment as not conducted.
         $user = auth()->user();
         if (!$user || $user->role !== 'teacher' || $assessment->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -340,6 +349,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('teacher.confirmations.not_conducted');
 
     Route::post('/api/teacher-confirmations/{assessment}/reschedule', function (Request $request, Assessment $assessment) {
+        // Reschedule a teacher's assessment and reset confirmation state.
         $user = auth()->user();
         if (!$user || $user->role !== 'teacher' || $assessment->user_id !== $user->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -364,6 +374,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('teacher.confirmations.reschedule');
 
     Route::get('/api/admin-assessments', function (Request $request) {
+        // Return assessment data for admin filters and dashboards.
         $user = auth()->user();
         if (!$user || $user->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -466,6 +477,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
      * API: FETCH ASSESSMENTS FOR THE SIDE PANEL
      */
 Route::get('/api/assessments-by-date', function (Request $request) {
+    // Return assessments for a specific date with role-based filtering.
     $user = auth()->user();
     $targetDate = $request->query('date');
     $filterGrade = $request->query('grade_level');
@@ -544,6 +556,7 @@ Route::get('/api/assessments-by-date', function (Request $request) {
      * API: FETCH NOTIFICATION DOTS
      */
     Route::get('/api/assessment-notifications', function (Request $request) {
+        // Return calendar notification counts and weekly limits for a month.
         $user = auth()->user();
         $month = $request->query('month', date('m'));
         $year = $request->query('year', date('Y'));
@@ -668,6 +681,7 @@ Route::get('/api/assessments-by-date', function (Request $request) {
      * ADMIN: ENROLL LOGIC
      */
     Route::post('/admin/enroll', function (Request $request) {
+        // Enroll a new student with grade/subject validation rules.
         if (auth()->user()->role !== 'admin') {
             abort(403);
         }
@@ -886,6 +900,7 @@ Route::get('/api/assessments-by-date', function (Request $request) {
     })->name('admin.enroll');
 
     Route::post('/admin/enroll-teacher', function (Request $request) {
+        // Enroll a new teacher with grade/subject/section assignments.
         if (auth()->user()->role !== 'admin') {
             abort(403);
         }
@@ -994,6 +1009,7 @@ Route::get('/api/assessments-by-date', function (Request $request) {
      * ADMIN: EMAIL SUMMARY
      */
 Route::get('/api/check-conflict', function (Request $request) {
+    // Check scheduling conflicts for assessments by date and type.
     $date = $request->query('date');
     $grade = $request->query('grade_level');
     $type = $request->query('type');
@@ -1054,6 +1070,7 @@ Route::get('/api/check-conflict', function (Request $request) {
     ]);
 });
     Route::get('/admin/send-daily-summary', function () {
+        // Email a daily schedule summary to admin users.
         if (auth()->user()->role !== 'admin') {
             abort(403);
         }

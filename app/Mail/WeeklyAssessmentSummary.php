@@ -27,13 +27,21 @@ class WeeklyAssessmentSummary extends Mailable
         public $weekEnd
     ) {}
 
-public function envelope(): Envelope {
-    return new Envelope(subject: 'Weekly Assessment Summary (Monday-Friday)');
-}
+    /**
+     * Define the email envelope details like subject.
+     */
+    public function envelope(): Envelope
+    {
+        return new Envelope(subject: 'Weekly Assessment Summary (Monday-Friday)');
+    }
 
-public function content(): Content {
-    return new Content(view: 'emails.weekly-summary');
-}
+    /**
+     * Define the email content view for the summary.
+     */
+    public function content(): Content
+    {
+        return new Content(view: 'emails.weekly-summary');
+    }
     /**
      * Get the attachments for the message.
      *

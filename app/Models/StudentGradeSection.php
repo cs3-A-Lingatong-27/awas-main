@@ -12,9 +12,11 @@ class StudentGradeSection extends Model
         'section',
     ];
 
+    /**
+     * Relationship: grade/section record belongs to a user.
+     */
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 }
-
