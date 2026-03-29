@@ -129,6 +129,7 @@ class Grade1012CatalogSeeder extends Seeder
             ['name' => 'Engineering', 'type' => 'elective', 'grade_level_start' => 11, 'grade_level_end' => 12],
             ['name' => 'Design and Make Technology', 'type' => 'elective', 'grade_level_start' => 11, 'grade_level_end' => 12],
             ['name' => 'Agriculture', 'type' => 'elective', 'grade_level_start' => 11, 'grade_level_end' => 12],
+            ['name' => 'Computer Science 5 Elective', 'type' => 'elective', 'grade_level_start' => 11, 'grade_level_end' => 12],
             ['name' => 'Biology 3 Elective', 'type' => 'elective', 'grade_level_start' => 11, 'grade_level_end' => 11],
             ['name' => 'Chemistry 3 Elective Class 1', 'type' => 'elective', 'grade_level_start' => 11, 'grade_level_end' => 11],
             ['name' => 'Chemistry 3 Elective Class 2', 'type' => 'elective', 'grade_level_start' => 11, 'grade_level_end' => 11],
