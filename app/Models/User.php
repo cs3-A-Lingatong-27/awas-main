@@ -50,6 +50,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // Store teacher assignments as JSON arrays in the DB.
             'assigned_grades' => 'array',
             'assigned_subjects' => 'array',
         ];
@@ -72,6 +73,7 @@ class User extends Authenticatable
      */
     public function studentGradeSection()
     {
+        // Per-student grade/section override (used for Grades 7–9).
         return $this->hasOne(StudentGradeSection::class);
     }
 
@@ -80,6 +82,7 @@ class User extends Authenticatable
      */
     public function studentSubjects()
     {
+        // Per-student elective/science_core subject assignments.
         return $this->hasMany(StudentSubject::class);
     }
 }

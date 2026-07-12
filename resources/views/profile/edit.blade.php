@@ -77,6 +77,15 @@
                                     </div>
 
                                     <div class="rounded-lg border border-gray-200 bg-white p-5">
+                                        <h3 class="text-lg font-semibold text-slate-800 mb-3">Password</h3>
+                                        @include('profile.partials.update-password-form', [
+                                            'currentPasswordId' => 'profile_current_password',
+                                            'newPasswordId' => 'profile_password',
+                                            'confirmPasswordId' => 'profile_password_confirmation',
+                                        ])
+                                    </div>
+
+                                    <div class="rounded-lg border border-gray-200 bg-white p-5">
                                         <h3 class="text-lg font-semibold text-slate-800 mb-2">Feedback</h3>
                                         <a href="https://forms.gle/x6s7cxEmCgnKZTxU6" target="_blank" rel="noopener noreferrer" class="text-blue-700 font-semibold hover:underline">
                                             Open Feedback Survey

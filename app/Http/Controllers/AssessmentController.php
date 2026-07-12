@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Assessment;
 use App\Models\Subject;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AssessmentController extends Controller
 {
@@ -17,10 +18,12 @@ class AssessmentController extends Controller
         $user = auth()->user();
 
     if ($user->role === 'teacher') {
+        // Teachers see assessments only for their assigned grades.
         // Teachers see only the grades they are assigned to
         $grades = is_array($user->assigned_grades) ? $user->assigned_grades : json_decode($user->assigned_grades, true) ?? [];
         $assessments = Assessment::whereIn('grade_level', $grades)->orderBy('scheduled_at', 'asc')->get();
     } else {
+        // Students see assessments only for their grade/section scope.
         // Students see only THEIR specific grade level
         // Assuming students have a 'grade_level' column in the users table
         $studentSection = $user->section;
@@ -56,12 +59,125 @@ class AssessmentController extends Controller
     }
 
     /**
+     * Update an assessment if the user owns it or is an administrator.
+     */
+    public function update(Request $request, Assessment $assessment)
+    {
+        $user = auth()->user();
+        if (!$user || ($user->role !== 'admin' && $assessment->user_id !== $user->id)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'type' => 'required|string',
+            'due_date' => 'required|date',
+            'due_time' => 'required',
+            'grade_level' => 'required|integer',
+            'subject' => 'required|string',
+            'section' => 'nullable|string|max:255',
+        ]);
+
+        $type = $validated['type'] === 'Alternative Assessment'
+            ? 'Alternative Assessment (AA)'
+            : $validated['type'];
+        $grade = (int) $validated['grade_level'];
+        $subjectName = $validated['subject'];
+        $sectionInput = filled($validated['section'] ?? null) ? trim((string) $validated['section']) : null;
+        $sectionList = $sectionInput
+            ? array_values(array_filter(array_map('trim', explode(',', $sectionInput))))
+            : [];
+
+        if ($user->role === 'teacher') {
+            $allowedGrades = is_array($user->assigned_grades)
+                ? $user->assigned_grades
+                : (json_decode($user->assigned_grades, true) ?? []);
+            $allowedGrades = array_map('intval', $allowedGrades);
+            $allowedSubjects = is_array($user->assigned_subjects)
+                ? $user->assigned_subjects
+                : (json_decode($user->assigned_subjects, true) ?? []);
+
+            if (!in_array($grade, $allowedGrades, true) || !in_array($subjectName, $allowedSubjects, true)) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized: You are not assigned to this Grade or Subject.'], 403);
+            }
+
+            $teacherSections = is_array($user->section)
+                ? $user->section
+                : array_values(array_filter(array_map('trim', explode(',', (string) $user->section))));
+            if (!empty($teacherSections) && !empty(array_diff($sectionList, $teacherSections))) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized: One or more sections are not assigned to you.'], 403);
+            }
+        }
+
+        $scheduledAt = Carbon::parse($validated['due_date'] . ' ' . $validated['due_time']);
+        $dayStart = $scheduledAt->copy()->startOfDay();
+        $dayEnd = $scheduledAt->copy()->endOfDay();
+
+        $sectionChecks = !empty($sectionList) ? $sectionList : [null];
+        foreach ($sectionChecks as $sectionCheck) {
+            $dailyQuery = Assessment::where('id', '!=', $assessment->id)
+                ->where(function ($q) use ($dayStart, $dayEnd) {
+                    $q->whereBetween('scheduled_at', [$dayStart, $dayEnd])
+                      ->orWhereBetween('due_date', [$dayStart, $dayEnd]);
+                })
+                ->where('grade_level', $grade);
+
+            if ($sectionCheck) {
+                $dailyQuery->where(function ($q) use ($sectionCheck) {
+                    $q->where('section', $sectionCheck)
+                        ->orWhere('section', 'like', '%' . $sectionCheck . '%')
+                        ->orWhere('description', 'like', '%Section: ' . $sectionCheck . '%');
+                });
+            } else {
+                $dailyQuery->whereNull('section');
+            }
+
+            if ($dailyQuery->count() >= 2) {
+                $sectionLabel = $sectionCheck ?: 'All Sections';
+                return response()->json(['success' => false, 'message' => "Conflict! Grade {$grade} ({$sectionLabel}) already has 2 assessments on this day."], 422);
+            }
+        }
+
+        if (in_array($type, ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment'], true)) {
+            $weekStart = $scheduledAt->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+            $weekEnd = $weekStart->copy()->addDays(4)->endOfDay();
+            $weeklyCount = Assessment::where('id', '!=', $assessment->id)
+                ->whereBetween('scheduled_at', [$weekStart, $weekEnd])
+                ->where('grade_level', $grade)
+                ->whereIn('type', ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment'])
+                ->count();
+
+            if ($weeklyCount >= 5) {
+                return response()->json(['success' => false, 'message' => "Conflict! Grade {$grade} already has 5 assessments this week."], 422);
+            }
+        }
+
+        $section = $sectionInput ? implode(', ', $sectionList) : null;
+        $assessment->fill([
+            'title' => $validated['title'],
+            'type' => $type,
+            'scheduled_at' => $scheduledAt,
+            'due_date' => $scheduledAt,
+            'grade_level' => $grade,
+            'section' => $section,
+            'subject_id' => null,
+            'description' => 'Subject: ' . $subjectName . ($section ? " | Section: {$section}" : ''),
+            'confirmation_status' => 'scheduled',
+            'confirmation_requested_at' => null,
+            'conducted_at' => null,
+        ])->save();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Validate and create (or reschedule) an assessment with policy checks.
      */
     public function store(Request $request)
     {
         $user = auth()->user();
 
+        // Role-scoped assignment lists (teachers/admins use these for authorization).
         $allowedGrades = is_array($user->assigned_grades) ? $user->assigned_grades : json_decode($user->assigned_grades, true) ?? [];
         $allowedSubjects = is_array($user->assigned_subjects) ? $user->assigned_subjects : json_decode($user->assigned_subjects, true) ?? [];
         $gradeSubjectMap = [
@@ -198,6 +314,7 @@ class AssessmentController extends Controller
         $rescheduleId = $request->input('reschedule_assessment_id');
         $rescheduleAssessment = null;
         if ($rescheduleId) {
+            // Reschedule: lock to the original assessment's data and owner.
             $rescheduleAssessment = Assessment::where('id', $rescheduleId)
                 ->where('user_id', $user->id)
                 ->firstOrFail();
@@ -212,12 +329,15 @@ class AssessmentController extends Controller
 
         $isLongTest1 = $type === 'Long Test 1 (Midterms)';
         $isLongTest2 = in_array($type, ['Long Test 2 (Quarterly Exam)', 'Long Test'], true);
+        $isWeeklyCapped = in_array($type, ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment'], true);
 
         if ($user->role === 'admin') {
+            // Admins may only schedule Long Test 2.
             if (!$isLongTest2) {
                 return back()->with('error', 'Admins can only schedule Long Test 2 (Quarterly Exam).');
             }
         } elseif (!in_array($grade, $allowedGrades) || !in_array($subjectName, $allowedSubjects)) {
+            // Teachers must be assigned to both the grade and subject.
             return back()->with('error', "Unauthorized: You are not assigned to this Grade or Subject.");
         }
 
@@ -238,10 +358,12 @@ class AssessmentController extends Controller
             ->first();
 
         if ($isLongTest2 && $user->role !== 'admin') {
+            // Long Test 2 is admin-only.
             return back()->with('error', 'Only administrators can schedule Long Test 2 (Quarterly Exam).');
         }
 
         if ($isLongTest1 && $user->role === 'teacher') {
+            // Long Test 1 is restricted to specific subjects; then capped per month.
             $isAllowedLongTest1 =
                 stripos($subjectName, 'Computer Science') !== false ||
                 stripos($subjectName, 'Integrated Science') !== false ||
@@ -258,20 +380,10 @@ class AssessmentController extends Controller
                 return back()->with('error', 'Long Test 1 (Midterms) is only allowed for Computer Science, Integrated Science, Mathematics, and Bio/Chem/Physics electives.');
             }
 
-            $monthStart = Carbon::parse($date)->startOfMonth()->startOfDay();
-            $monthEnd = Carbon::parse($date)->endOfMonth()->endOfDay();
-            $monthlyQuery = Assessment::where('user_id', $user->id)
-                ->where('grade_level', $grade)
-                ->where('type', 'Long Test 1 (Midterms)')
-                ->whereBetween('scheduled_at', [$monthStart, $monthEnd]);
-            if ($rescheduleAssessment) {
-                $monthlyQuery->where('id', '!=', $rescheduleAssessment->id);
-            }
-            if ($monthlyQuery->count() >= 1) {
-                return back()->with('error', "Only 1 Long Test 1 (Midterms) per month is allowed for Grade $grade.");
-            }
+            // Monthly cap check is enforced under a DB lock below.
         }
 
+        // Section rules: electives/science_core can be exempt from section assignment.
         $isScienceCoreExempt = $subjectMeta && $subjectMeta->type === 'science_core' && in_array($requestedGrade, [11, 12], true);
         $isElectiveExempt = $subjectMeta && $subjectMeta->type === 'elective' && $requestedGrade >= 10 && $requestedGrade <= 12;
         $sectionExempt = $isScienceCoreExempt || $isElectiveExempt;
@@ -291,6 +403,7 @@ class AssessmentController extends Controller
             }
 
             if ($user->role === 'teacher') {
+                // Teachers can only schedule for their assigned sections.
                 $teacherSections = is_array($user->section)
                     ? $user->section
                     : array_values(array_filter(array_map('trim', explode(',', (string) $user->section))));
@@ -305,50 +418,155 @@ class AssessmentController extends Controller
         }
         $section = $sectionInput ? implode(', ', $sectionList) : null;
 
-        // 3. THE AWAS ALGORITHM (Weekly combined cap for FA/AA)
-        if (in_array($type, ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment'], true)) {
+        // Lock keys to prevent race conditions when multiple teachers schedule at once.
+        $lockKeys = [];
+        $dayStart = Carbon::parse($date)->startOfDay();
+        $dayEnd = Carbon::parse($date)->endOfDay();
+        $sectionChecks = !empty($sectionList) ? $sectionList : [null];
+        foreach ($sectionChecks as $sectionCheck) {
+            $sectionKey = $sectionCheck ? preg_replace('/\s+/', '_', (string) $sectionCheck) : 'all';
+            $lockKeys[] = "awas:grade:{$grade}:day:" . $dayStart->toDateString() . ":section:{$sectionKey}";
+        }
+        $weekStart = null;
+        $weekEnd = null;
+        if ($isWeeklyCapped) {
             $weekStart = Carbon::parse($date)->startOfWeek(Carbon::MONDAY)->startOfDay();
             $weekEnd = $weekStart->copy()->addDays(4)->endOfDay();
+            $lockKeys[] = "awas:grade:{$grade}:week:" . $weekStart->toDateString();
+        }
+        $monthStart = null;
+        $monthEnd = null;
+        if ($isLongTest1 && $user->role === 'teacher') {
+            $monthStart = Carbon::parse($date)->startOfMonth()->startOfDay();
+            $monthEnd = Carbon::parse($date)->endOfMonth()->endOfDay();
+            $lockKeys[] = "awas:lt1:user:{$user->id}:grade:{$grade}:month:" . $monthStart->format('Y-m');
+        }
 
-            $weeklyQuery = Assessment::whereBetween('scheduled_at', [$weekStart, $weekEnd])
-                ->where('grade_level', $grade)
-                ->whereIn('type', ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment']);
-
-            if ($rescheduleAssessment) {
-                $weeklyQuery->where('id', '!=', $rescheduleAssessment->id);
-            }
-
-            $weeklyCount = $weeklyQuery->count();
-            if ($weeklyCount >= 5) {
-                return back()->with('error', "Conflict! Grade $grade already has 5 assessments this week.");
+        $locks = [];
+        $supportsAdvisoryLocks = in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true);
+        if ($supportsAdvisoryLocks) {
+            foreach ($lockKeys as $key) {
+                $row = DB::selectOne('SELECT GET_LOCK(?, ?) as acquired', [$key, 5]);
+                if (!$row || (int) $row->acquired !== 1) {
+                    foreach ($locks as $held) {
+                        DB::select('SELECT RELEASE_LOCK(?)', [$held]);
+                    }
+                    return back()->with('error', 'System is busy. Please retry in a few seconds.');
+                }
+                $locks[] = $key;
             }
         }
 
-        if ($rescheduleAssessment) {
-            $rescheduleAssessment->scheduled_at = $date . ' ' . $request->due_time;
-            $rescheduleAssessment->due_date = $date . ' ' . $request->due_time;
-            $rescheduleAssessment->confirmation_status = 'scheduled';
-            $rescheduleAssessment->confirmation_requested_at = null;
-            $rescheduleAssessment->conducted_at = null;
-            $rescheduleAssessment->save();
+        try {
+            return DB::transaction(function () use (
+                $isWeeklyCapped,
+                $isLongTest1,
+                $user,
+                $grade,
+                $dayStart,
+                $dayEnd,
+                $sectionChecks,
+                $weekStart,
+                $weekEnd,
+                $monthStart,
+                $monthEnd,
+                $rescheduleAssessment,
+                $date,
+                $request,
+                $type,
+                $section,
+                $subjectName
+            ) {
+                // Daily cap: max 2 assessments per grade + section per day.
+                foreach ($sectionChecks as $sectionCheck) {
+                    $dailyQuery = Assessment::where(function ($q) use ($dayStart, $dayEnd) {
+                        $q->whereBetween('scheduled_at', [$dayStart, $dayEnd])
+                          ->orWhereBetween('due_date', [$dayStart, $dayEnd]);
+                    })->where('grade_level', $grade);
 
-            return back()->with('success', 'Assessment rescheduled successfully!');
+                    if ($sectionCheck) {
+                        $dailyQuery->where(function ($q) use ($sectionCheck) {
+                            $q->where('section', $sectionCheck)
+                                ->orWhere('section', 'like', '%' . $sectionCheck . '%')
+                                ->orWhere('description', 'like', '%Section: ' . $sectionCheck . '%');
+                        });
+                    } else {
+                        $dailyQuery->whereNull('section');
+                    }
+
+                    if ($rescheduleAssessment) {
+                        $dailyQuery->where('id', '!=', $rescheduleAssessment->id);
+                    }
+
+                    if ($dailyQuery->count() >= 2) {
+                        $sectionLabel = $sectionCheck ?: 'All Sections';
+                        return back()->with('error', "Conflict! Grade $grade ({$sectionLabel}) already has 2 assessments on this day.");
+                    }
+                }
+
+                // Weekly cap: max 5 FA/AA assessments per grade (Mon–Fri).
+                if ($isWeeklyCapped && $weekStart && $weekEnd) {
+                    $weeklyQuery = Assessment::whereBetween('scheduled_at', [$weekStart, $weekEnd])
+                        ->where('grade_level', $grade)
+                        ->whereIn('type', ['Formative Assessment', 'Alternative Assessment (AA)', 'Alternative Assessment']);
+
+                    if ($rescheduleAssessment) {
+                        $weeklyQuery->where('id', '!=', $rescheduleAssessment->id);
+                    }
+
+                    if ($weeklyQuery->count() >= 5) {
+                        return back()->with('error', "Conflict! Grade $grade already has 5 assessments this week.");
+                    }
+                }
+
+                // Monthly cap: only 1 Long Test 1 per teacher per grade per month.
+                if ($isLongTest1 && $user->role === 'teacher' && $monthStart && $monthEnd) {
+                    $monthlyQuery = Assessment::where('user_id', $user->id)
+                        ->where('grade_level', $grade)
+                        ->where('type', 'Long Test 1 (Midterms)')
+                        ->whereBetween('scheduled_at', [$monthStart, $monthEnd]);
+                    if ($rescheduleAssessment) {
+                        $monthlyQuery->where('id', '!=', $rescheduleAssessment->id);
+                    }
+                    if ($monthlyQuery->count() >= 1) {
+                        return back()->with('error', "Only 1 Long Test 1 (Midterms) per month is allowed for Grade $grade.");
+                    }
+                }
+
+                if ($rescheduleAssessment) {
+                    // Persist a reschedule instead of creating a new assessment.
+                    $rescheduleAssessment->scheduled_at = $date . ' ' . $request->due_time;
+                    $rescheduleAssessment->due_date = $date . ' ' . $request->due_time;
+                    $rescheduleAssessment->confirmation_status = 'scheduled';
+                    $rescheduleAssessment->confirmation_requested_at = null;
+                    $rescheduleAssessment->conducted_at = null;
+                    $rescheduleAssessment->save();
+
+                    return back()->with('success', 'Assessment rescheduled successfully!');
+                }
+
+                // Save new assessment.
+                Assessment::create([
+                    'title'        => $request->title,
+                    'type'         => $type,
+                    'scheduled_at' => $date . ' ' . $request->due_time,
+                    'due_date'     => $date . ' ' . $request->due_time,
+                    'grade_level'  => $grade,
+                    'section'      => $section,
+                    'subject_id'   => null,
+                    'description'  => "Subject: " . $subjectName . ($section ? " | Section: {$section}" : ''),
+                    'user_id'      => $user->id,
+                    'confirmation_status' => 'scheduled',
+                ]);
+
+                return back()->with('success', 'Assessment scheduled successfully!');
+            });
+        } finally {
+            if ($supportsAdvisoryLocks) {
+                foreach ($locks as $held) {
+                    DB::select('SELECT RELEASE_LOCK(?)', [$held]);
+                }
+            }
         }
-
-        // 4. Save
-        Assessment::create([
-            'title'        => $request->title,
-            'type'         => $type,
-            'scheduled_at' => $date . ' ' . $request->due_time,
-            'due_date'     => $date . ' ' . $request->due_time,
-            'grade_level'  => $grade,
-            'section'      => $section,
-            'subject_id'   => null, 
-            'description'  => "Subject: " . $subjectName . ($section ? " | Section: {$section}" : ''),
-            'user_id'      => $user->id, 
-            'confirmation_status' => 'scheduled',
-        ]);
-
-        return back()->with('success', 'Assessment scheduled successfully!');
     }
 }

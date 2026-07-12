@@ -65,6 +65,7 @@ class Assessment extends Model
      */
     public function teacher(): BelongsTo
     {
+        // Explicit FK name to link assessments back to their creator.
         return $this->belongsTo(User::class, 'user_id');
     }
 }

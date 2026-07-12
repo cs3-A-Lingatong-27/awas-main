@@ -14,6 +14,7 @@ public function up(): void
     Schema::create('assessments', function (Blueprint $table) {
         $table->id();
         // 1. Link to the Teacher (Crucial for line 73 of your controller)
+        // Cascade delete so a teacher removal cleans up their assessments.
         $table->foreignId('user_id')->constrained()->onDelete('cascade'); 
         
         $table->foreignId('subject_id')->nullable()->constrained()->onDelete('cascade');
@@ -22,6 +23,7 @@ public function up(): void
         // 2. Added for AWAS logic
         $table->integer('grade_level'); 
         $table->string('section')->nullable(); 
+        // Scheduling timestamps used by calendar + conflict checks.
         $table->dateTime('scheduled_at'); 
         $table->string('type'); 
         $table->string('title');

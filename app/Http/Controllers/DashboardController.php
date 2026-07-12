@@ -15,6 +15,7 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
     $user = auth()->user();
+    // Pull the selected month/year (defaults to current).
     $month = $request->get('month', date('m'));
     $year = $request->get('year', date('Y'));
     $date = Carbon::createFromDate($year, $month, 1);
@@ -22,6 +23,7 @@ class DashboardController extends Controller
     // Get the arrays we set up in Tinker
     $assignedGrades = is_array($user->assigned_grades) ? $user->assigned_grades : json_decode($user->assigned_grades, true) ?? [];
 
+    // Month range used for calendar counts.
     $startOfMonth = $date->copy()->startOfMonth()->toDateTimeString();
     $endOfMonth = $date->copy()->endOfMonth()->toDateTimeString();
 
@@ -35,6 +37,7 @@ $query = Assessment::whereIn('grade_level', $assignedGrades)
     });
 
 // 2. Process counts (Grouping by the correct date)
+    // Group per day number to drive the calendar dots.
 $notifications = $query->get()
     ->groupBy(function($val) {
         // Use scheduled_at if it exists, otherwise use due_date

@@ -106,11 +106,12 @@
                             <th class="px-4 py-3">Subject</th>
                             <th class="px-4 py-3">Subject Type</th>
                             <th class="px-4 py-3">Scheduled</th>
+                            <th class="px-4 py-3 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody id="adminAssessmentsBody" class="divide-y divide-gray-100 bg-white">
                         <tr>
-                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
+                            <td colspan="8" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -141,11 +142,12 @@
                             <th class="px-4 py-3">Grade</th>
                             <th class="px-4 py-3">Subject</th>
                             <th class="px-4 py-3">Scheduled</th>
+                            <th class="px-4 py-3 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody id="teacherAssessmentsBody" class="divide-y divide-gray-100 bg-white">
                         <tr>
-                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -308,52 +310,36 @@
                     </form>
                     <h2 class="text-xl font-bold">{{ $date->format('F Y') }}</h2>
                 </div>
-                @if(auth()->user()->role === 'teacher')
-                    @php
-                        $teacherFilterGrades = is_array(auth()->user()->assigned_grades) ? auth()->user()->assigned_grades : (json_decode(auth()->user()->assigned_grades, true) ?? []);
-                        $teacherFilterSubjects = is_array(auth()->user()->assigned_subjects) ? auth()->user()->assigned_subjects : (json_decode(auth()->user()->assigned_subjects, true) ?? []);
-                        $teacherFilterSections = collect(explode(',', (string) auth()->user()->section))
-                            ->map(fn($s) => trim($s))
-                            ->filter()
-                            ->values()
-                            ->all();
-                    @endphp
+                @if(auth()->user()->role === 'teacher' || auth()->user()->role === 'admin')
                     <div class="mb-3 relative inline-block z-[120]">
                         <button id="openCalendarFilterPanelBtn" type="button" class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             Filters
                         </button>
-                        <button id="openTeacherAssessmentsBtn" type="button" class="ml-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100">
-                            My Assessments
-                        </button>
-                        <button id="openTeacherConfirmationsBtn" type="button" class="ml-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100">
-                            Notifications
-                        </button>
+                        @if(auth()->user()->role === 'teacher')
+                            <button id="openTeacherAssessmentsBtn" type="button" class="ml-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100">
+                                My Assessments
+                            </button>
+                            <button id="openTeacherConfirmationsBtn" type="button" class="ml-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100">
+                                Notifications
+                            </button>
+                        @endif
                         <div id="teacherCalendarFilterPanel" class="hidden fixed z-[220] w-72 rounded border border-gray-200 bg-white p-3 shadow-2xl">
                             <div class="mb-2">
                                 <label class="block text-xs font-semibold text-gray-600 mb-1">Grade</label>
                                 <select id="teacherCalendarGradeFilter" class="w-full border p-1 rounded text-sm">
                                     <option value="">All Grades</option>
-                                    @foreach($teacherFilterGrades as $grade)
-                                        <option value="{{ $grade }}">Grade {{ $grade }}</option>
-                                    @endforeach
                                 </select>
                             </div>
                             <div class="mb-2">
                                 <label class="block text-xs font-semibold text-gray-600 mb-1">Section</label>
                                 <select id="teacherCalendarSectionFilter" class="w-full border p-1 rounded text-sm">
                                     <option value="">All Sections</option>
-                                    @foreach($teacherFilterSections as $section)
-                                        <option value="{{ $section }}">{{ $section }}</option>
-                                    @endforeach
                                 </select>
                             </div>
                             <div class="mb-3">
                                 <label class="block text-xs font-semibold text-gray-600 mb-1">Subject</label>
                                 <select id="teacherCalendarSubjectFilter" class="w-full border p-1 rounded text-sm">
                                     <option value="">All Subjects</option>
-                                    @foreach($teacherFilterSubjects as $subject)
-                                        <option value="{{ $subject }}">{{ $subject }}</option>
-                                    @endforeach
                                 </select>
                             </div>
                             <div class="flex justify-end gap-2">
@@ -512,6 +498,15 @@
 
         <div id="settingsTabContent" class="hidden">
             <div class="rounded-lg border border-gray-200 bg-white p-4">
+                <h4 class="font-semibold text-slate-800 mb-3">Password</h4>
+                @include('profile.partials.update-password-form', [
+                    'currentPasswordId' => 'dashboard_current_password',
+                    'newPasswordId' => 'dashboard_password',
+                    'confirmPasswordId' => 'dashboard_password_confirmation',
+                ])
+            </div>
+
+            <div class="rounded-lg border border-gray-200 bg-white p-4 mt-3">
                 <h4 class="font-semibold text-slate-800 mb-3">Display</h4>
                 <label class="flex items-center justify-between text-sm">
                     <span>Dark Mode</span>
@@ -570,6 +565,17 @@ let tempDateString = '';
 const userRole = "{{ auth()->user()->role }}";
 let canSchedule = userRole === 'teacher' || userRole === 'admin';
 let weekFullDays = new Set();
+
+function applyWeekFullStyles(dayEl, isFull) {
+    if (!dayEl) return;
+    if (isFull) {
+        dayEl.classList.add('week-full', 'bg-red-50', 'ring-1', 'ring-red-200', 'hover:bg-red-100');
+        dayEl.setAttribute('title', 'Week is full (5 assessments).');
+    } else {
+        dayEl.classList.remove('week-full', 'bg-red-50', 'ring-1', 'ring-red-200', 'hover:bg-red-100');
+        dayEl.removeAttribute('title');
+    }
+}
 let hoverHideTimer = null;
 const hoverCache = new Map();
 let pendingReschedule = null;
@@ -693,6 +699,7 @@ const subjectsByGrade = {
         "Physics 4 Elective"
     ],
 };
+// Fallback subject lists if the live subject catalog is empty.
 const regularSubjectsByGrade = {
     10: [
         "Biology 2",
@@ -870,6 +877,7 @@ async function handleChoice(action) {
         }
         document.getElementById('panelDateTitle').innerText = "Schedule for " + tempDateString;
         document.getElementById('hiddenDate').value = tempDate;
+        setAssessmentFormMode('create');
         document.getElementById('assessmentPanel').classList.add('open');
         document.getElementById('panelOverlay').classList.add('active');
         document.body.classList.add('overflow-hidden');
@@ -938,6 +946,11 @@ function closeChoiceModal() {
 // 1. Get the subjects assigned to this specific teacher from PHP
 const assignedSubjects = @json(auth()->user()->assigned_subjects ?? []);
 const assignedGrades = @json(auth()->user()->assigned_grades ?? []);
+const assignedSections = @json(collect(explode(',', (string) auth()->user()->section))
+    ->map(fn($s) => trim($s))
+    ->filter()
+    ->values()
+    ->all());
 const subjectCatalog = @json($subjectCatalog ?? []);
 const hoverCard = document.getElementById('calendarHoverCard');
 const hoverCardDateTitle = document.getElementById('hoverCardDateTitle');
@@ -983,6 +996,135 @@ function getCsrfToken() {
     return tokenMeta ? tokenMeta.getAttribute('content') : '';
 }
 
+function setAssessmentFormMode(mode, assessmentId = null) {
+    const form = document.querySelector('#assessmentPanel form');
+    const methodInput = document.getElementById('assessmentMethodInput');
+    if (!form || !methodInput) return;
+
+    if (mode === 'edit' && assessmentId) {
+        form.action = `/assessments/${assessmentId}`;
+        methodInput.value = 'PUT';
+        methodInput.disabled = false;
+        return;
+    }
+
+    form.action = "{{ route('assessments.store') }}";
+    methodInput.value = 'POST';
+    methodInput.disabled = true;
+}
+
+function setAssessmentSections(sectionValue) {
+    const sectionChecklist = document.getElementById('sectionChecklist');
+    const sectionHidden = document.getElementById('sectionHidden');
+    if (!sectionChecklist || !sectionHidden) return;
+
+    const selectedSections = sectionValue
+        ? String(sectionValue).split(',').map((section) => section.trim()).filter(Boolean)
+        : [];
+
+    sectionChecklist.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+        input.checked = selectedSections.includes(input.value);
+    });
+    sectionHidden.value = selectedSections.join(', ');
+}
+
+function openEditAssessmentPanel(assessment) {
+    if (!assessment || !assessment.id) return;
+
+    const panel = document.getElementById('assessmentPanel');
+    const overlay = document.getElementById('panelOverlay');
+    const titleInput = document.querySelector('#assessmentPanel input[name="title"]');
+    const gradeSelect = document.getElementById('gradeSelect');
+    const subjectSelect = document.getElementById('subjectSelect');
+    const typeSelect = document.getElementById('assessmentTypeSelect');
+    const timeInput = document.querySelector('#assessmentPanel input[name="due_time"]');
+    const hiddenDate = document.getElementById('hiddenDate');
+    const panelTitle = document.getElementById('panelDateTitle');
+
+    setAssessmentFormMode('edit', assessment.id);
+    clearRescheduleFields();
+
+    if (panelTitle) {
+        panelTitle.innerText = 'Edit Assessment';
+    }
+    if (hiddenDate) {
+        hiddenDate.value = assessment.due_date || '';
+    }
+    if (titleInput) {
+        titleInput.value = assessment.title || '';
+        titleInput.readOnly = false;
+    }
+    if (gradeSelect) {
+        gradeSelect.disabled = false;
+        gradeSelect.value = String(assessment.grade_level || '');
+    }
+
+    updateAssessmentSubjectOptions();
+    if (subjectSelect) {
+        const subject = assessment.subject || '';
+        if (subject && !Array.from(subjectSelect.options).some((option) => option.value === subject)) {
+            const option = document.createElement('option');
+            option.value = subject;
+            option.textContent = subject;
+            subjectSelect.appendChild(option);
+        }
+        subjectSelect.disabled = false;
+        subjectSelect.value = subject;
+    }
+
+    updateAssessmentSectionOptions();
+    setAssessmentSections(assessment.section || '');
+    syncAssessmentSectionState();
+
+    if (typeSelect) {
+        typeSelect.disabled = false;
+        typeSelect.value = assessment.type || '';
+    }
+    if (timeInput) {
+        timeInput.value = assessment.due_time || '';
+    }
+
+    if (panel) panel.classList.add('open');
+    if (overlay) overlay.classList.add('active');
+    document.body.classList.add('overflow-hidden');
+    checkConflict();
+}
+
+async function deleteAssessmentById(id, title, button, afterDelete) {
+    if (!id) return;
+    const confirmed = window.confirm(`Delete "${title || 'this assessment'}" permanently?`);
+    if (!confirmed) return;
+
+    if (button) button.disabled = true;
+
+    try {
+        const response = await fetch(`/assessments/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({}),
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
+        }
+
+        showRoleFlash('Assessment deleted successfully.');
+        hoverCache.clear();
+        refreshCalendarNotifications();
+        if (typeof afterDelete === 'function') {
+            afterDelete();
+        }
+    } catch (error) {
+        if (button) button.disabled = false;
+        showRoleFlash(error?.message || 'Failed to delete assessment.', '#dc2626');
+    }
+}
+
 function getIsoDateFromDay(day) {
     const year = {{ $date->year }};
     const month = String({{ $date->month }}).padStart(2, '0');
@@ -1001,10 +1143,16 @@ function isPastDate(isoDate) {
       const grades = Array.isArray(assignedGrades) && assignedGrades.length > 0 ? assignedGrades : [];
       if (grades.length === 0) return false;
 
+    const filters = getTeacherCalendarFilters();
     const checks = await Promise.all(
         grades.map(async (grade) => {
             try {
-                const response = await fetch(`/api/check-conflict?date=${isoDate}&grade_level=${grade}`);
+                const params = new URLSearchParams({
+                    date: isoDate,
+                    grade_level: grade,
+                });
+                if (filters.section) params.set('section', filters.section);
+                const response = await fetch(`/api/check-conflict?${params.toString()}`);
                 if (!response.ok) return false;
                 const data = await response.json();
                 return data.status === 'CRITICAL';
@@ -1028,6 +1176,9 @@ function isPastDate(isoDate) {
                   type: pendingReschedule.type,
                   assessment_id: pendingReschedule.id,
               });
+              if (pendingReschedule.section) {
+                  params.set('section', pendingReschedule.section);
+              }
               const response = await fetch(`/api/check-conflict?${params.toString()}`);
               if (!response.ok) return false;
               const data = await response.json();
@@ -1280,7 +1431,9 @@ function setRescheduleMeta() {
         const cell = document.createElement('div');
         cell.className = 'calendar-day reschedule-day';
         if (canHighlightWeeks && weekFullDays.includes(day)) {
-            cell.classList.add('week-full');
+            applyWeekFullStyles(cell, true);
+        } else {
+            applyWeekFullStyles(cell, false);
         }
         cell.dataset.day = day;
         cell.tabIndex = 0;
@@ -1461,11 +1614,113 @@ async function checkAndOpenConfirmationsWindow(force = false) {
 }
 
 function getTeacherCalendarFilters() {
-    if (userRole !== 'teacher') {
+    if (userRole !== 'teacher' && userRole !== 'admin') {
         return { grade_level: '', section: '', subject: '' };
     }
 
     return appliedTeacherCalendarFilters;
+}
+
+function setSelectOptions(selectEl, items, allLabel) {
+    if (!selectEl) return;
+    const current = selectEl.value;
+    selectEl.innerHTML = '';
+    const allOption = document.createElement('option');
+    allOption.value = '';
+    allOption.textContent = allLabel;
+    selectEl.appendChild(allOption);
+    items.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        selectEl.appendChild(option);
+    });
+    if (current && items.includes(current)) {
+        selectEl.value = current;
+    }
+}
+
+function getCatalogSubjectsForGrade(grade) {
+    const catalogSubjects = subjectCatalog
+        .filter((subject) =>
+            Number(subject.grade_level_start) <= grade &&
+            Number(subject.grade_level_end) >= grade
+        )
+        .map((subject) => subject.name);
+    const fallbackSubjects = getSubjectsForGrade(grade);
+    return [...new Set([...catalogSubjects, ...fallbackSubjects])];
+}
+
+function getAllCalendarGrades() {
+    if (userRole === 'teacher') {
+        return Array.isArray(assignedGrades) ? assignedGrades.map((g) => String(g)) : [];
+    }
+    return Object.keys(sectionsByGrade || {});
+}
+
+function getAllCalendarSections() {
+    if (userRole === 'teacher') {
+        return Array.isArray(assignedSections) ? assignedSections : [];
+    }
+    const allSections = [];
+    Object.values(sectionsByGrade || {}).forEach((sections) => {
+        if (Array.isArray(sections)) {
+            allSections.push(...sections);
+        }
+    });
+    return [...new Set(allSections)];
+}
+
+function getAllCalendarSubjects() {
+    if (userRole === 'teacher') {
+        return Array.isArray(assignedSubjects) ? assignedSubjects : [];
+    }
+    const allSubjects = [];
+    Object.keys(sectionsByGrade || {}).forEach((gradeKey) => {
+        const grade = parseInt(gradeKey, 10);
+        allSubjects.push(...getCatalogSubjectsForGrade(grade));
+    });
+    return [...new Set(allSubjects)];
+}
+
+function refreshTeacherCalendarFilterOptions() {
+    if (teacherCalendarGradeFilter) {
+        const current = teacherCalendarGradeFilter.value;
+        teacherCalendarGradeFilter.innerHTML = '';
+        const allOption = document.createElement('option');
+        allOption.value = '';
+        allOption.textContent = 'All Grades';
+        teacherCalendarGradeFilter.appendChild(allOption);
+        getAllCalendarGrades().map(String).forEach((grade) => {
+            const option = document.createElement('option');
+            option.value = grade;
+            option.textContent = `Grade ${grade}`;
+            teacherCalendarGradeFilter.appendChild(option);
+        });
+        if (current) {
+            teacherCalendarGradeFilter.value = current;
+        }
+    }
+
+    const gradeValue = teacherCalendarGradeFilter ? teacherCalendarGradeFilter.value : '';
+    if (!gradeValue) {
+        setSelectOptions(teacherCalendarSectionFilter, getAllCalendarSections(), 'All Sections');
+        setSelectOptions(teacherCalendarSubjectFilter, getAllCalendarSubjects(), 'All Subjects');
+        return;
+    }
+
+    const gradeInt = parseInt(gradeValue, 10);
+    const gradeSections = (sectionsByGrade[String(gradeInt)] || []);
+    const sectionOptions = userRole === 'teacher'
+        ? gradeSections.filter((section) => assignedSections.includes(section))
+        : gradeSections;
+    setSelectOptions(teacherCalendarSectionFilter, sectionOptions, 'All Sections');
+
+    const gradeSubjects = getCatalogSubjectsForGrade(gradeInt);
+    const subjectOptions = userRole === 'teacher'
+        ? gradeSubjects.filter((subject) => assignedSubjects.includes(subject))
+        : gradeSubjects;
+    setSelectOptions(teacherCalendarSubjectFilter, subjectOptions, 'All Subjects');
 }
 
 function buildAdminFilterTypes() {
@@ -1534,7 +1789,7 @@ function buildAdminAssessmentParams() {
 async function loadAdminAssessments() {
     if (!adminAssessmentsBody || !adminAssessmentsStatus) return;
     adminAssessmentsStatus.textContent = 'Loading...';
-    adminAssessmentsBody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+    adminAssessmentsBody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
 
     try {
         const params = buildAdminAssessmentParams();
@@ -1545,13 +1800,13 @@ async function loadAdminAssessments() {
         const data = await response.json();
 
         if (!Array.isArray(data) || data.length === 0) {
-            adminAssessmentsBody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">No assessments found.</td></tr>';
+            adminAssessmentsBody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-slate-500">No assessments found.</td></tr>';
             adminAssessmentsStatus.textContent = 'No assessments scheduled.';
             return;
         }
 
         adminAssessmentsBody.innerHTML = data.map((assessment) => `
-            <tr>
+            <tr data-assessment-id="${assessment.id}">
                 <td class="px-4 py-3 font-semibold text-slate-800">${assessment.title}</td>
                 <td class="px-4 py-3 text-slate-600">${assessment.type}</td>
                 <td class="px-4 py-3 text-slate-600">${assessment.grade_level ?? '-'}</td>
@@ -1559,12 +1814,59 @@ async function loadAdminAssessments() {
                 <td class="px-4 py-3 text-slate-600">${assessment.subject ?? '-'}</td>
                 <td class="px-4 py-3 text-slate-600">${assessment.subject_type ?? '-'}</td>
                 <td class="px-4 py-3 text-slate-500 text-xs">${assessment.scheduled_at ?? '-'}</td>
+                <td class="px-4 py-3 text-right">
+                    <button
+                        type="button"
+                        class="admin-delete-assessment-btn inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-sm font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        data-assessment-id="${assessment.id}"
+                        data-assessment-title="${String(assessment.title ?? 'this assessment').replace(/"/g, '&quot;')}"
+                        title="Delete assessment"
+                        aria-label="Delete assessment"
+                    >X</button>
+                </td>
             </tr>
         `).join('');
         adminAssessmentsStatus.textContent = `Showing ${data.length} assessment(s).`;
     } catch (error) {
-        adminAssessmentsBody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-red-500">Failed to load assessments.</td></tr>';
+        adminAssessmentsBody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-red-500">Failed to load assessments.</td></tr>';
         adminAssessmentsStatus.textContent = error?.message || 'Failed to load assessments.';
+    }
+}
+
+async function deleteAdminAssessment(id, title, button) {
+    if (!id) return;
+    const confirmed = window.confirm(`Delete "${title || 'this assessment'}" permanently?`);
+    if (!confirmed) return;
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        const response = await fetch(`/assessments/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        showRoleFlash('Assessment deleted successfully.');
+        await loadAdminAssessments();
+        if (typeof refreshCalendarNotifications === 'function') {
+            refreshCalendarNotifications();
+        }
+    } catch (error) {
+        if (button) {
+            button.disabled = false;
+        }
+        showRoleFlash(error?.message || 'Failed to delete assessment.', '#dc2626');
     }
 }
 
@@ -1582,6 +1884,7 @@ function openTeacherCalendarFilterPanel() {
     if (!teacherCalendarFilterPanel || !openCalendarFilterPanelBtn) return;
     ensureTeacherCalendarFilterPanelTopLayer();
     positionTeacherCalendarFilterPanel();
+    refreshTeacherCalendarFilterOptions();
     teacherCalendarFilterPanel.classList.remove('hidden');
 }
 
@@ -1786,9 +2089,9 @@ async function refreshCalendarNotifications() {
               <div class="calendar-day-dots">${dots.join('')}</div>
           `;
           if (canHighlightWeeks && weekFullDays.has(Number(day))) {
-              dayEl.classList.add('week-full');
+              applyWeekFullStyles(dayEl, true);
           } else {
-              dayEl.classList.remove('week-full');
+              applyWeekFullStyles(dayEl, false);
           }
       });
       updateWeekStatusBanner(tempDate);
@@ -1989,10 +2292,22 @@ function updateAssessmentSubjectOptions() {
         return;
     }
 
-    const gradeSubjects = getSubjectsForGrade(selectedGrade);
-    const allowedSubjectsForUser = userRole === 'teacher'
-        ? gradeSubjects.filter((subject) => assignedSubjects.includes(subject))
-        : gradeSubjects;
+    const catalogSubjects = subjectCatalog
+        .filter((subject) =>
+            Number(subject.grade_level_start) <= selectedGrade &&
+            Number(subject.grade_level_end) >= selectedGrade
+        )
+        .map((subject) => subject.name);
+    const fallbackSubjects = getSubjectsForGrade(selectedGrade);
+    const gradeSubjects = [...new Set([...catalogSubjects, ...fallbackSubjects])];
+    let allowedSubjectsForUser = gradeSubjects;
+    if (userRole === 'teacher') {
+        if (Array.isArray(assignedSubjects) && assignedSubjects.length > 0) {
+            allowedSubjectsForUser = gradeSubjects.filter((subject) => assignedSubjects.includes(subject));
+        } else {
+            allowedSubjectsForUser = [];
+        }
+    }
 
     if (allowedSubjectsForUser.length === 0) {
         const option = document.createElement('option');
@@ -2053,6 +2368,7 @@ function updateAssessmentSectionOptions() {
         input.addEventListener('change', () => {
             const selected = Array.from(sectionChecklist.querySelectorAll('input[type="checkbox"]:checked')).map((i) => i.value);
             sectionHidden.value = selected.join(', ');
+            checkConflict();
         });
 
         const span = document.createElement('span');
@@ -2163,9 +2479,21 @@ async function checkConflict() {
     const date = document.getElementById('hiddenDate').value;
     const type = document.getElementById('assessmentTypeSelect')?.value || '';
     const rescheduleId = document.getElementById('rescheduleAssessmentId');
+    const sectionHidden = document.getElementById('sectionHidden');
+    const subjectSelect = document.getElementById('subjectSelect');
     const adviceDiv = document.getElementById('awas-advice');
 
     if (!grade || !date) return;
+    if (!adviceDiv) return;
+
+    const sectionIsRequired = !shouldDisableSectionForSubject(subjectSelect?.value || '', grade);
+    if (sectionIsRequired && (!sectionHidden || !sectionHidden.value || sectionHidden.value.trim() === '')) {
+        adviceDiv.classList.remove('hidden');
+        adviceDiv.innerText = 'Select at least one section to check conflicts.';
+        adviceDiv.className = "text-xs mt-2 p-2 rounded bg-red-100 text-red-700 border border-red-200";
+        setAssessmentSubmitBlocked(true);
+        return;
+    }
 
     try {
         // Calling the API route we created in web.php
@@ -2174,6 +2502,9 @@ async function checkConflict() {
             grade_level: grade,
             type,
         });
+        if (sectionHidden && sectionHidden.value) {
+            params.set('section', sectionHidden.value);
+        }
         if (rescheduleId && !rescheduleId.disabled && rescheduleId.value) {
             params.set('assessment_id', rescheduleId.value);
         }
@@ -2186,15 +2517,28 @@ async function checkConflict() {
         // Change color based on status
         if (data.status === 'CRITICAL') {
             adviceDiv.className = "text-xs mt-2 p-2 rounded bg-red-100 text-red-700 border border-red-200";
+            setAssessmentSubmitBlocked(true);
         } else if (data.status === 'WARNING') {
             adviceDiv.className = "text-xs mt-2 p-2 rounded bg-yellow-100 text-yellow-700 border border-yellow-200";
+            setAssessmentSubmitBlocked(false);
         } else {
             adviceDiv.className = "text-xs mt-2 p-2 rounded bg-green-100 text-green-700 border border-green-200";
+            setAssessmentSubmitBlocked(false);
         }
     } catch (e) {
         console.error("AWAS Check failed", e);
     }
 }
+
+function setAssessmentSubmitBlocked(blocked) {
+    const submitButton = document.querySelector('#assessmentPanel form button[type="submit"]');
+    if (!submitButton) return;
+
+    submitButton.disabled = blocked;
+    submitButton.classList.toggle('opacity-60', blocked);
+    submitButton.classList.toggle('cursor-not-allowed', blocked);
+}
+
 function initSchedulingAssessmentPanel() {
     const assessmentPanelForm = document.querySelector('#assessmentPanel form');
     const assessmentGradeSelect = document.getElementById('gradeSelect');
@@ -2226,6 +2570,7 @@ function initSchedulingAssessmentPanel() {
     const assessmentSubjectSelect = document.getElementById('subjectSelect');
     if (assessmentSubjectSelect) {
         assessmentSubjectSelect.addEventListener('change', syncAssessmentSectionState);
+        assessmentSubjectSelect.addEventListener('change', checkConflict);
     }
 
     const assessmentForm = document.querySelector('#assessmentPanel form');
@@ -2234,16 +2579,46 @@ function initSchedulingAssessmentPanel() {
             const sectionHidden = document.getElementById('sectionHidden');
             const subjectSelect = document.getElementById('subjectSelect');
             const gradeSelect = document.getElementById('gradeSelect');
+            const methodInput = document.getElementById('assessmentMethodInput');
             if (!sectionHidden || !subjectSelect || !gradeSelect) return;
 
             const disableSection = shouldDisableSectionForSubject(subjectSelect.value, gradeSelect.value);
-            if (disableSection) {
+            if (!disableSection && (!sectionHidden.value || sectionHidden.value.trim() === '')) {
+                event.preventDefault();
+                showRoleFlash('Select at least one section for this assessment.', '#dc2626');
                 return;
             }
 
-            if (!sectionHidden.value || sectionHidden.value.trim() === '') {
+            if (methodInput && !methodInput.disabled && methodInput.value === 'PUT') {
                 event.preventDefault();
-                showRoleFlash('Select at least one section for this assessment.', '#dc2626');
+                const submitButton = assessmentForm.querySelector('button[type="submit"]');
+                if (submitButton) submitButton.disabled = true;
+
+                fetch(assessmentForm.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfToken(),
+                        'Accept': 'application/json',
+                    },
+                    body: new FormData(assessmentForm),
+                })
+                    .then(async (response) => {
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(data?.message || data?.error || `Request failed with status ${response.status}`);
+                        }
+                        showRoleFlash('Assessment updated successfully.');
+                        closeAllPanels();
+                        setAssessmentFormMode('create');
+                        hoverCache.clear();
+                        refreshCalendarNotifications();
+                    })
+                    .catch((error) => {
+                        showRoleFlash(error?.message || 'Failed to update assessment.', '#dc2626');
+                    })
+                    .finally(() => {
+                        if (submitButton) submitButton.disabled = false;
+                    });
             }
         });
     }
@@ -2274,7 +2649,7 @@ calendarDayElements.forEach((dayEl) => {
     dayEl.addEventListener('mouseleave', queueHideHoverCard);
 });
 
-if (userRole === 'teacher') {
+if (userRole === 'teacher' || userRole === 'admin') {
     if (openCalendarFilterPanelBtn) {
         openCalendarFilterPanelBtn.addEventListener('click', openTeacherCalendarFilterPanel);
     }
@@ -2283,6 +2658,9 @@ if (userRole === 'teacher') {
     }
     if (confirmCalendarFilterBtn) {
         confirmCalendarFilterBtn.addEventListener('click', confirmTeacherCalendarFilters);
+    }
+    if (teacherCalendarGradeFilter) {
+        teacherCalendarGradeFilter.addEventListener('change', refreshTeacherCalendarFilterOptions);
     }
 
     document.addEventListener('click', (e) => {
@@ -2312,7 +2690,7 @@ if (userRole === 'teacher') {
     async function loadTeacherAssessments() {
         if (!teacherAssessmentsBody || !teacherAssessmentsStatus) return;
         teacherAssessmentsStatus.textContent = 'Loading...';
-        teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+        teacherAssessmentsBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
 
         try {
             const response = await fetch('/api/teacher-assessments');
@@ -2322,23 +2700,29 @@ if (userRole === 'teacher') {
             const data = await response.json();
 
             if (!Array.isArray(data) || data.length === 0) {
-                teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">No assessments found.</td></tr>';
+                teacherAssessmentsBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">No assessments found.</td></tr>';
                 teacherAssessmentsStatus.textContent = 'No assessments scheduled.';
                 return;
             }
 
             teacherAssessmentsBody.innerHTML = data.map((assessment) => `
-                <tr>
+                <tr data-assessment='${JSON.stringify(assessment).replace(/'/g, '&#39;')}'>
                     <td class="px-4 py-3 font-semibold text-slate-800">${assessment.title}</td>
                     <td class="px-4 py-3 text-slate-600">${assessment.type}</td>
                     <td class="px-4 py-3 text-slate-600">${assessment.grade_level ?? '-'}</td>
                     <td class="px-4 py-3 text-slate-600">${assessment.subject ?? '-'}</td>
                     <td class="px-4 py-3 text-slate-500 text-xs">${assessment.scheduled_at ?? '-'}</td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex justify-end gap-2">
+                            <button type="button" class="teacher-edit-assessment-btn rounded border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100" data-assessment-id="${assessment.id}">Edit</button>
+                            <button type="button" class="teacher-delete-assessment-btn inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-xs font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60" data-assessment-id="${assessment.id}" data-assessment-title="${String(assessment.title ?? 'this assessment').replace(/"/g, '&quot;')}" title="Delete assessment" aria-label="Delete assessment">X</button>
+                        </div>
+                    </td>
                 </tr>
             `).join('');
             teacherAssessmentsStatus.textContent = `Showing ${data.length} assessment(s).`;
         } catch (error) {
-            teacherAssessmentsBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-red-500">Failed to load assessments.</td></tr>';
+            teacherAssessmentsBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-red-500">Failed to load assessments.</td></tr>';
             teacherAssessmentsStatus.textContent = error?.message || 'Failed to load assessments.';
         }
     }
@@ -2369,6 +2753,34 @@ if (userRole === 'teacher') {
                 teacherAssessmentsModal.classList.remove('flex');
                 teacherAssessmentsModal.style.display = 'none';
                 document.body.classList.remove('overflow-hidden');
+            }
+        });
+    }
+
+    if (teacherAssessmentsBody) {
+        teacherAssessmentsBody.addEventListener('click', (event) => {
+            const editButton = event.target.closest('.teacher-edit-assessment-btn');
+            const deleteButton = event.target.closest('.teacher-delete-assessment-btn');
+
+            if (editButton) {
+                const row = editButton.closest('tr');
+                const assessment = row?.dataset?.assessment ? JSON.parse(row.dataset.assessment) : null;
+                if (!assessment) return;
+
+                teacherAssessmentsModal.classList.add('hidden');
+                teacherAssessmentsModal.classList.remove('flex');
+                teacherAssessmentsModal.style.display = 'none';
+                openEditAssessmentPanel(assessment);
+                return;
+            }
+
+            if (deleteButton) {
+                deleteAssessmentById(
+                    deleteButton.dataset.assessmentId,
+                    deleteButton.dataset.assessmentTitle || 'this assessment',
+                    deleteButton,
+                    loadTeacherAssessments
+                );
             }
         });
     }
@@ -2517,6 +2929,17 @@ if (adminAssessmentsModal) {
     });
 }
 
+if (adminAssessmentsBody) {
+    adminAssessmentsBody.addEventListener('click', (event) => {
+        const deleteButton = event.target.closest('.admin-delete-assessment-btn');
+        if (!deleteButton) return;
+
+        const id = deleteButton.dataset.assessmentId;
+        const title = deleteButton.dataset.assessmentTitle || 'this assessment';
+        deleteAdminAssessment(id, title, deleteButton);
+    });
+}
+
 if (adminAssessmentGradeFilter) {
     adminAssessmentGradeFilter.addEventListener('change', () => {
         populateAdminSectionOptions();
@@ -2560,16 +2983,28 @@ if (adminAssessmentTitleFilter) {
 window.addEventListener('scroll', hideHoverCard, { passive: true });
 window.addEventListener('resize', hideHoverCard);
 
+const shouldOpenSettingsPanel = @json(session('status') === 'password-updated' || $errors->updatePassword->any());
+
+function initializeScholarPanelState() {
+    if (shouldOpenSettingsPanel) {
+        openScholarPanel();
+        showScholarPanelTab('settings');
+        return;
+    }
+
+    showScholarPanelTab('profile');
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         initSchedulingAssessmentPanel();
         initThemeSettings();
-        showScholarPanelTab('profile');
+        initializeScholarPanelState();
     });
 } else {
     initSchedulingAssessmentPanel();
     initThemeSettings();
-    showScholarPanelTab('profile');
+    initializeScholarPanelState();
 }
 
 renderTeacherSubjectTypeOptions();
@@ -2660,6 +3095,7 @@ refreshCalendarNotifications();
     <div class="panel-body">
         <form action="{{ route('assessments.store') }}" method="POST" class="mini-form">
             @csrf
+            <input type="hidden" name="_method" id="assessmentMethodInput" value="POST" disabled>
             <input type="hidden" name="reschedule_assessment_id" id="rescheduleAssessmentId" disabled>
             <input type="hidden" name="grade_level" id="rescheduleGradeHidden" disabled>
             <input type="hidden" name="subject" id="rescheduleSubjectHidden" disabled>

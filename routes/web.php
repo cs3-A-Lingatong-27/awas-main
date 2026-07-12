@@ -112,6 +112,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return response()->json($payload);
     })->name('admin.enrollment.students');
 
+    Route::delete('/admin/enrollment/users/{user}', function (User $user) {
+        if (auth()->user()->role !== 'admin') {
+            abort(403);
+        }
+
+        if (!in_array($user->role, ['student', 'teacher'], true)) {
+            return response()->json(['error' => 'Only student and teacher profiles can be deleted here.'], 422);
+        }
+
+        if ($user->is(auth()->user())) {
+            return response()->json(['error' => 'You cannot delete your own account from this list.'], 422);
+        }
+
+        if ($user->email === 'subject.catalog@crc.pshs.edu.ph') {
+            return response()->json(['error' => 'Subject Catalog is a system profile and cannot be deleted from this list.'], 422);
+        }
+
+        StudentGradeSection::where('user_id', $user->id)->delete();
+        StudentSubject::where('user_id', $user->id)->delete();
+        $user->delete();
+
+        return response()->json(['success' => true]);
+    })->name('admin.enrollment.users.destroy');
+
     Route::get('/admin/enrollment/teachers', function (Request $request) {
         // Return filtered teacher enrollment data for the admin UI.
         if (auth()->user()->role !== 'admin') {
@@ -224,7 +248,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Assessments
+    // Schedule a new assessment or reschedule via AssessmentController@store.
     Route::post('/assessments', [AssessmentController::class, 'store'])->name('assessments.store');
+    // Update an assessment (admin or owner).
+    Route::put('/assessments/{assessment}', [AssessmentController::class, 'update'])->name('assessments.update');
+    // Delete an assessment (admin or owner).
     Route::delete('/assessments/{assessment}', [AssessmentController::class, 'destroy'])->name('assessments.destroy');
 
     Route::get('/api/teacher-assessments', function (Request $request) {
@@ -244,21 +272,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return null;
         };
 
+        $extractSection = function (?string $description): ?string {
+            if (!$description) {
+                return null;
+            }
+            if (preg_match('/Section:\\s*([^|]+)/i', $description, $matches) === 1) {
+                return trim($matches[1]);
+            }
+            return null;
+        };
+
         return Assessment::where('user_id', $user->id)
             ->orderBy('scheduled_at', 'desc')
             ->get()
-            ->map(function ($a) use ($extractSubject) {
+            ->map(function ($a) use ($extractSubject, $extractSection) {
                 $subject = $a->subject ? $a->subject->name : null;
                 if (!$subject) {
                     $subject = $extractSubject($a->description);
                 }
+                $scheduledAt = $a->scheduled_at ? Carbon::parse($a->scheduled_at) : null;
                 return [
                     'id' => $a->id,
                     'title' => $a->title,
                     'type' => $a->type,
                     'grade_level' => $a->grade_level,
+                    'section' => $a->section ?: $extractSection($a->description),
                     'subject' => $subject ?: 'Unspecified Subject',
-                    'scheduled_at' => $a->scheduled_at ? Carbon::parse($a->scheduled_at)->format('M d, Y g:i A') : 'No time set',
+                    'scheduled_at' => $scheduledAt ? $scheduledAt->format('M d, Y g:i A') : 'No time set',
+                    'due_date' => $scheduledAt ? $scheduledAt->toDateString() : null,
+                    'due_time' => $scheduledAt ? $scheduledAt->format('H:i') : null,
                 ];
             });
     })->name('teacher.assessments');
@@ -477,6 +519,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
      * API: FETCH ASSESSMENTS FOR THE SIDE PANEL
      */
 Route::get('/api/assessments-by-date', function (Request $request) {
+    // Calendar hover/details: return assessments for a single date, scoped by role.
     // Return assessments for a specific date with role-based filtering.
     $user = auth()->user();
     $targetDate = $request->query('date');
@@ -998,13 +1041,54 @@ Route::get('/api/assessments-by-date', function (Request $request) {
      * ADMIN: EMAIL SUMMARY
      */
 Route::get('/api/check-conflict', function (Request $request) {
+    // Scheduling guardrail: check weekly caps and LT1 monthly limit before submit.
     // Check scheduling conflicts for assessments by date and type.
     $date = $request->query('date');
     $grade = $request->query('grade_level');
     $type = $request->query('type');
     $assessmentId = $request->query('assessment_id');
+    $section = $request->query('section');
 
     if (!$date || !$grade) return response()->json(['status' => 'SAFE']);
+
+    $dayStart = Carbon::parse($date)->startOfDay();
+    $dayEnd = Carbon::parse($date)->endOfDay();
+    $sectionChecks = [];
+    if (is_string($section) && $section !== '') {
+        $sectionChecks = array_values(array_filter(array_map('trim', explode(',', $section))));
+    }
+    if (empty($sectionChecks)) {
+        $sectionChecks = [null];
+    }
+
+    foreach ($sectionChecks as $sectionCheck) {
+        $dailyQuery = Assessment::where(function ($q) use ($dayStart, $dayEnd) {
+            $q->whereBetween('scheduled_at', [$dayStart, $dayEnd])
+              ->orWhereBetween('due_date', [$dayStart, $dayEnd]);
+        })->where('grade_level', $grade);
+
+        if ($sectionCheck) {
+            $dailyQuery->where(function ($q) use ($sectionCheck) {
+                $q->where('section', $sectionCheck)
+                  ->orWhere('section', 'like', '%' . $sectionCheck . '%')
+                  ->orWhere('description', 'like', '%Section: ' . $sectionCheck . '%');
+            });
+        } else {
+            $dailyQuery->whereNull('section');
+        }
+
+        if ($assessmentId) {
+            $dailyQuery->where('id', '!=', $assessmentId);
+        }
+
+        if ($dailyQuery->count() >= 2) {
+            $sectionLabel = $sectionCheck ?: 'All Sections';
+            return response()->json([
+                'status' => 'CRITICAL',
+                'message' => "Conflict! Grade {$grade} ({$sectionLabel}) already has 2 assessments on this day."
+            ]);
+        }
+    }
 
     $weekStart = Carbon::parse($date)->startOfWeek(Carbon::MONDAY)->startOfDay();
     $weekEnd = $weekStart->copy()->addDays(4)->endOfDay();

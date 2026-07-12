@@ -310,10 +310,13 @@
         </div>
 
         <div id="settingsTabContent" class="hidden">
-            <div class="profile-card">
-                <p class="text-muted">Settings are managed in the main profile page.</p>
-                <div class="menu-divider"></div>
-                <a class="logout-action-btn" href="{{ route('profile.edit') }}">Open Profile Settings</a>
+            <div class="rounded-lg border border-gray-200 bg-white p-4">
+                <h4 class="font-semibold text-slate-800 mb-3">Password</h4>
+                @include('profile.partials.update-password-form', [
+                    'currentPasswordId' => 'enrollment_current_password',
+                    'newPasswordId' => 'enrollment_password',
+                    'confirmPasswordId' => 'enrollment_password_confirmation',
+                ])
             </div>
         </div>
     </div>
@@ -366,11 +369,12 @@
                             <th class="px-4 py-3">Grade</th>
                             <th class="px-4 py-3">Section</th>
                             <th class="px-4 py-3">Subjects</th>
+                            <th class="px-4 py-3 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody id="studentListBody" class="divide-y divide-gray-100 bg-white">
                         <tr>
-                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -420,11 +424,12 @@
                             <th class="px-4 py-3">Grades</th>
                             <th class="px-4 py-3">Sections</th>
                             <th class="px-4 py-3">Subjects</th>
+                            <th class="px-4 py-3 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody id="teacherListBody" class="divide-y divide-gray-100 bg-white">
                         <tr>
-                            <td colspan="5" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
+                            <td colspan="6" class="px-4 py-6 text-center text-slate-500">No data loaded yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -894,6 +899,49 @@ function updateStudentFilterSectionOptions() {
     }
 }
 
+function getCsrfToken() {
+    const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+    return tokenMeta ? tokenMeta.getAttribute('content') : '';
+}
+
+async function deleteEnrollmentUser(id, role, name, button) {
+    if (!id) return;
+    const confirmed = window.confirm(`Delete ${role} profile "${name || 'this user'}" permanently?`);
+    if (!confirmed) return;
+
+    if (button) {
+        button.disabled = true;
+    }
+
+    try {
+        const response = await fetch(`/admin/enrollment/users/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({}),
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data?.error || `Request failed with status ${response.status}`);
+        }
+
+        if (role === 'student') {
+            fetchStudentList();
+        } else {
+            fetchTeacherList();
+        }
+    } catch (error) {
+        if (button) {
+            button.disabled = false;
+        }
+        window.alert(error?.message || 'Failed to delete profile.');
+    }
+}
+
 async function fetchStudentList() {
     if (!studentFilterGrade || !studentListBody || !studentListStatus) return;
 
@@ -903,14 +951,14 @@ async function fetchStudentList() {
     if (studentFilterGroup.value) params.set('group', studentFilterGroup.value);
 
     studentListStatus.textContent = 'Loading students...';
-    studentListBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+    studentListBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
 
     try {
         const response = await fetch(`/admin/enrollment/students?${params.toString()}`);
         const data = await response.json();
 
         if (!Array.isArray(data) || data.length === 0) {
-            studentListBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">No students found.</td></tr>';
+            studentListBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">No students found.</td></tr>';
             studentListStatus.textContent = 'No results for the selected filters.';
             return;
         }
@@ -929,13 +977,16 @@ async function fetchStudentList() {
                     <td class="px-4 py-3 text-slate-600">${student.grade_level ?? '-'}</td>
                     <td class="px-4 py-3 text-slate-600">${student.section ?? '-'}</td>
                     <td class="px-4 py-3 text-slate-500 text-xs">${subjects || '-'}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button type="button" class="delete-enrollment-user-btn inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-sm font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60" data-user-id="${student.id}" data-user-role="student" data-user-name="${String(student.name ?? 'this student').replace(/"/g, '&quot;')}" title="Delete student" aria-label="Delete student">X</button>
+                    </td>
                 </tr>
             `;
         }).join('');
 
         studentListStatus.textContent = `Showing ${data.length} student(s).`;
     } catch (error) {
-        studentListBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-red-500">Failed to load students.</td></tr>';
+        studentListBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-red-500">Failed to load students.</td></tr>';
         studentListStatus.textContent = 'Failed to load students.';
     }
 }
@@ -981,14 +1032,14 @@ async function fetchTeacherList() {
     }
 
     teacherListStatus.textContent = 'Loading teachers...';
-    teacherListBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
+    teacherListBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">Loading...</td></tr>';
 
     try {
         const response = await fetch(`/admin/enrollment/teachers?${params.toString()}`);
         const data = await response.json();
 
         if (!Array.isArray(data) || data.length === 0) {
-            teacherListBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">No teachers found.</td></tr>';
+            teacherListBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">No teachers found.</td></tr>';
             teacherListStatus.textContent = 'No results for the selected filters.';
             return;
         }
@@ -1008,13 +1059,16 @@ async function fetchTeacherList() {
                     <td class="px-4 py-3 text-slate-600">${gradeText}</td>
                     <td class="px-4 py-3 text-slate-600">${teacher.sections || '-'}</td>
                     <td class="px-4 py-3 text-slate-500 text-xs">${subjectText}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button type="button" class="delete-enrollment-user-btn inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-sm font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60" data-user-id="${teacher.id}" data-user-role="teacher" data-user-name="${String(teacher.name ?? 'this teacher').replace(/"/g, '&quot;')}" title="Delete teacher" aria-label="Delete teacher">X</button>
+                    </td>
                 </tr>
             `;
         }).join('');
 
         teacherListStatus.textContent = `Showing ${data.length} teacher(s).`;
     } catch (error) {
-        teacherListBody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-red-500">Failed to load teachers.</td></tr>';
+        teacherListBody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-red-500">Failed to load teachers.</td></tr>';
         teacherListStatus.textContent = 'Failed to load teachers.';
     }
 }
@@ -1361,6 +1415,20 @@ if (studentFilterGroup) {
     studentFilterGroup.addEventListener('change', fetchStudentList);
 }
 
+if (studentListBody) {
+    studentListBody.addEventListener('click', (event) => {
+        const button = event.target.closest('.delete-enrollment-user-btn');
+        if (!button) return;
+
+        deleteEnrollmentUser(
+            button.dataset.userId,
+            button.dataset.userRole || 'student',
+            button.dataset.userName || 'this student',
+            button
+        );
+    });
+}
+
 if (showTeacherListBtn && teacherListModal) {
     showTeacherListBtn.addEventListener('click', () => {
         teacherListModal.classList.remove('hidden');
@@ -1400,6 +1468,20 @@ if (teacherFilterSubject) {
     teacherFilterSubject.addEventListener('change', fetchTeacherList);
 }
 
+if (teacherListBody) {
+    teacherListBody.addEventListener('click', (event) => {
+        const button = event.target.closest('.delete-enrollment-user-btn');
+        if (!button) return;
+
+        deleteEnrollmentUser(
+            button.dataset.userId,
+            button.dataset.userRole || 'teacher',
+            button.dataset.userName || 'this teacher',
+            button
+        );
+    });
+}
+
 function openScholarPanel() {
     document.getElementById('scholarPanel').classList.add('open');
     document.getElementById('panelOverlay').classList.add('active');
@@ -1429,6 +1511,12 @@ function showScholarPanelTab(tabName) {
     settingsTabBtn.className = isSettings
         ? 'rounded-md px-3 py-2 text-sm font-semibold bg-white text-slate-800 shadow-sm'
         : 'rounded-md px-3 py-2 text-sm font-semibold text-slate-600';
+}
+
+const shouldOpenSettingsPanel = @json(session('status') === 'password-updated' || $errors->updatePassword->any());
+if (shouldOpenSettingsPanel) {
+    openScholarPanel();
+    showScholarPanelTab('settings');
 }
 </script>
 </body>
